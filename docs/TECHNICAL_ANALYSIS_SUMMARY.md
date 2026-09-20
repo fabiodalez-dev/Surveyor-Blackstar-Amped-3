@@ -1,18 +1,18 @@
 # Analisi Protocollo Blackstar Architect e Amped 3
 
+> **Nota di correzione (20 settembre 2026).** Questo documento conserva anche l'ipotesi iniziale del progetto — il controllo via MIDI CC — che le catture hanno poi smentito per l'uso che ne fa l'app. Le sezioni interessate sono marcate come superate: fa fede il protocollo USB HID descritto nel [README](../README.md) e in [CABRIG_DSP_FORMAT.md](CABRIG_DSP_FORMAT.md). Nessuna affermazione qui dentro va citata senza leggere il riquadro che la precede.
+
 ## L'Analisi del Software
 L'obiettivo iniziale era decompilare l'applicazione macOS **Blackstar Architect** per estrarne il protocollo di comunicazione (HID o SysEx proprietario) per poter controllare i parametri della pedaliera Amped 3 (ed eventualmente altri amplificatori Blackstar supportati) direttamente da un cellulare.
 
-Analizzando il bundle `Blackstar Architect.app` (una monolitica build C++ Mach-O, presumibilmente basata sul framework JUCE, molto comune in ambito audio) abbiamo potuto ispezionare le stringhe binarie e la struttura delle risorse. 
+Analizzando il bundle `Blackstar Architect.app` (una monolitica build C++ Mach-O, presumibilmente basata sul framework JUCE, molto comune in ambito audio) ho ispezionato le stringhe binarie e la struttura delle risorse. 
 
-## La Scoperta: Supporto MIDI Nativo
-Cercando i pattern SysEx e la gestione dei parametri, è emersa un'ottima notizia dai manuali e dalle definizioni tecniche del firmware Blackstar:
-A differenza di modelli più vecchi della serie ID:Core che necessitavano di complesse chiamate USB HID (Reverse Engineering), **la serie Dept. 10 Amped (inclusa la tua Amped 3) supporta nativamente lo standard MIDI (Control Change messages) tramite USB e TRS MIDI**.
+## ~~La Scoperta: Supporto MIDI Nativo~~ — IPOTESI SUPERATA
 
-Ciò significa che **non è necessario un protocollo di reverse engineering proprietario**! I parametri del suono sono direttamente mappati su standard MIDI CC.
+> **Questa sezione era sbagliata e viene conservata solo come traccia del percorso.** L'idea che bastasse il MIDI CC nasceva dalle stringhe del binario e dalla documentazione Blackstar, non da una cattura. Quando ho intercettato il traffico reale di Architect sulla mia Amped 3, non c'era un solo messaggio MIDI: Architect parla **USB HID**, con report da 64 byte e comandi `0x16` (parametri ampli), `0xa9` (parametri CabRig) e `0xaa`/`0xab`/`0xac` (trasferimento dei coefficienti). L'app usa `UsbManager` con `controlTransfer` SET_REPORT e `UsbRequest` sull'endpoint interrupt, **non** `android.media.midi`: la sincronizzazione con lo stato reale della pedaliera via MIDI non era ottenibile. La tabella qui sotto non è mai stata verificata sull'hardware in questo progetto e non è usata da Surveyor; resta a titolo documentale per chi volesse provare la strada MIDI TRS, che è un problema diverso dal controllo bidirezionale.
 
-### Mappatura CC MIDI per Amped 3
-Il canale MIDI di default è il **Canale 1** (modificabile tramite Architect). Ecco i comandi CC per il controllo dei parametri del preamplificatore in tempo reale:
+### Mappatura CC MIDI per Amped 3 (non verificata, non usata dall'app)
+Il canale MIDI di default sarebbe il **Canale 1** (modificabile tramite Architect). Valori tratti dalla documentazione, non da una cattura:
 
 | Parametro | CC# (Control Change) | Range Valore |
 | :--- | :---: | :--- |
@@ -28,16 +28,17 @@ Il canale MIDI di default è il **Canale 1** (modificabile tramite Architect). E
 | Presence | 15 | 127 (On) |
 | Master Volume | 16 | 0 - 127 |
 
-> [!TIP]
-> Poiché usa standard MIDI, l'app Android che ho creato invia semplicemente messaggi MIDI universali alla porta USB. Questo la rende teoricamente **compatibile con qualsiasi pedaliera** o modulo Blackstar (es: Amped 1, Amped 2) che supporti il protocollo MIDI CC standard!
+> [!WARNING]
+> Il corollario che ne avevo tratto — «compatibile con qualsiasi pedaliera Blackstar» — cade insieme all'ipotesi. L'app filtra su VID `27d4` / PID `0072` e parla un protocollo HID proprietario: la compatibilità con Amped 1 e Amped 2 è **ignota**, non probabile. Servono i descrittori USB di quelle unità e una cattura, non un'assunzione.
 
 ## L'Applicazione Android (APK)
 Ho creato il progetto Android **Amped 3 Controller** all'interno del tuo workspace in `~/Documents/GitHub/Blackstar/AmpedController`.
 
-L'applicazione utilizza l'API nativa `android.media.midi` per interfacciarsi con i dispositivi USB.
-1. **Come funziona:** Appena lanciata, o premendo "Reconnect MIDI", l'app scansiona le periferiche USB connesse tramite OTG. Se trova un device MIDI (come la pedaliera Amped), apre un canale di output.
-2. **Interfaccia (UI):** Ho scritto l'interfaccia con Jetpack Compose. Mostra slider che vanno da 0 a 127.
-3. **Comunicazione:** Spostando uno slider, l'app compone il pacchetto MIDI di 3 byte (Status CC, CC number, Value) e lo invia direttamente alla testata.
+> **Aggiornato al trasporto reale.** La prima versione usava `android.media.midi`; quella attuale no.
+1. **Come funziona:** l'app cerca via `UsbManager` il dispositivo VID `27d4` / PID `0072`, chiede il permesso, rivendica l'interfaccia HID e interroga la pedaliera con `[07, ...]` per leggerne lo stato completo (52 byte per l'ampli, 84 per il CabRig) prima di mostrare qualsiasi valore.
+2. **Interfaccia (UI):** Jetpack Compose, tema carbone/corallo. Gli slider partono dai valori letti dall'hardware, non da un default: finché la lettura non è arrivata non sono manovrabili.
+3. **Comunicazione:** muovendo uno slider l'app invia un report da 64 byte `[0x16, offset, 0, 1, valore]` (oppure `0xa9` per il CabRig) con padding a zero, e rilegge lo stato per confermare il valore effettivo.
+4. **Nome storico:** il file si chiama ancora `AmpedMidiController.kt`. È un residuo dell'ipotesi MIDI, non una descrizione di cosa fa.
 
 ## Come installare l'APK e testarlo
 La build dell'APK è in esecuzione in background.
@@ -75,4 +76,6 @@ Questa architettura permette di approssimare molto fedelmente le risonanze e la 
 * Lo strumento possiede anche una modalità sperimentale `--fit-ir` per adattare una risposta in frequenza desiderata (da un file mono.wav) direttamente al banco di poli biquad, rendendo teoricamente possibile caricare curve EQ o IR custom sulla pedaliera.
 
 ### Persistenza e Sicurezza
-La procedura di salvataggio dei preset sulla memoria fisica del Mac e su Android è stata confermata: include lettura pre-save, fsync locale e verifica del corretto caricamento dopo la scrittura, riducendo a zero il rischio di corruzione dei banchi.
+La procedura di salvataggio nei banchi permanenti è documentata ed è stata esercitata sull'hardware dal lato Mac: backup dei sei slot, scrittura, richiamo di un altro slot, richiamo del banco scritto, confronto e ripristino byte per byte (vedi [STORAGE_VERIFICATION.md](STORAGE_VERIFICATION.md)). Su Android la sequenza fa lettura pre-salvataggio, fsync del backup locale, attesa dell'ACK, rilettura e confronto di nome e dati, e dichiara un esito **non confermato** se uno di questi passi fallisce.
+
+Il rischio non è «ridotto a zero» e scriverlo sarebbe falso: la verifica AMP copre i primi nove parametri continui del formato compatto da 15 byte, non tutti gli interruttori, e mancano ancora la prova di ritenzione dopo spegnimento fisico e un salvataggio completo fatto da Android. Fino ad allora vale la regola operativa: backup prima di ogni scrittura, e un backup fallito ferma la scrittura.

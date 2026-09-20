@@ -4,6 +4,25 @@ package com.example.amped3controller
 object AmpedProtocol {
     const val VID = 0x27d4
     const val PID = 0x0072
+
+    /* CabRig offsets verified on the hardware on 2026-09-20: one Architect control was moved
+       at a time while capturing the a9 reports it sent. The two cut frequencies used to be
+       swapped in the UI; the factory eqPresets below corroborate the corrected pairing, since
+       "Cocked Wah" cuts lows hard (67 high) and highs hard (83 low). */
+    const val CAB_CABINET_LEVEL = 3
+    const val CAB_ROOM_LEVEL = 57
+    const val CAB_MASTER_LEVEL = 65
+    const val CAB_LOW_CUT_ON = 66
+    const val CAB_LOW_CUT_FREQ = 67
+    const val CAB_EQ_BANDS = 70
+    const val CAB_HIGH_CUT_ON = 82
+    const val CAB_HIGH_CUT_FREQ = 83
+    val cabEqBands = listOf(70, 73, 77, 81)
+    /* AMP offsets 0..9 verified the same day by correlating the live block with the values
+       Architect displayed for each knob; every knob matched exactly one offset. */
+    const val AMP_STATUS = 32
+    const val AMP_BOOST_BIT = 64
+    const val AMP_REVERB_ON = 33
     fun packet(vararg values: Int): ByteArray {
         require(values.size <= 64 && values.all { it in 0..255 })
         return ByteArray(64).also { b -> values.forEachIndexed { i, v -> b[i] = v.toByte() } }
@@ -20,7 +39,7 @@ object AmpedProtocol {
         require(slot in 1..3)
         val limit = if (cab) 21 else 23
         require(name.isNotBlank() && name.length <= limit && name.all { it.code in 32..126 }) {
-            "Nome: da 1 a $limit caratteri ASCII stampabili"
+            T("Nome: da 1 a $limit caratteri ASCII stampabili", "Name: 1 to $limit printable ASCII characters")
         }
         return packet(2, if (cab) 2 else 0x12, slot, name.length, *name.map { it.code }.toIntArray())
     }
@@ -63,7 +82,7 @@ data class AmpState(
     val connected: Boolean = false,
     val synced: Boolean = false,
     val busy: Boolean = false,
-    val status: String = "Collega AMPED 3 via USB",
+    val status: String = "",
     val amp: List<Int> = List(52) { -1 },
     val cab: List<Int> = List(84) { -1 },
     val ampSlot: Int = 0,

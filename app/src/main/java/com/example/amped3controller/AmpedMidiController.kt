@@ -51,7 +51,7 @@ class AmpedMidiController(private val context: Context) {
             when (intent.action) {
                 permissionAction -> if (d != null && d.vendorId == AmpedProtocol.VID && d.productId == AmpedProtocol.PID) {
                     if (intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)) open(d)
-                    else mutable.update { it.copy(status = "Permesso USB negato. Tocca Connetti per riprovare.") }
+                    else mutable.update { it.copy(status = T("Permesso USB negato. Tocca Connetti per riprovare.", "USB permission denied. Tap Connect to retry.")) }
                 }
                 UsbManager.ACTION_USB_DEVICE_ATTACHED -> connectToAmp()
                 UsbManager.ACTION_USB_DEVICE_DETACHED -> if (d?.deviceId == deviceId) disconnect()
@@ -72,10 +72,10 @@ class AmpedMidiController(private val context: Context) {
     fun connectToAmp() {
         if (running.get()) { refresh(); return }
         val d = manager.deviceList.values.firstOrNull { it.vendorId == AmpedProtocol.VID && it.productId == AmpedProtocol.PID }
-        if (d == null) { mutable.update { it.copy(status = "AMPED 3 non collegata · usa un cavo USB dati / OTG") }; return }
+        if (d == null) { mutable.update { it.copy(status = T("AMPED 3 non collegata · usa un cavo USB dati / OTG", "AMPED 3 not connected · use a USB data / OTG cable")) }; return }
         deviceId = d.deviceId
         if (manager.hasPermission(d)) open(d) else {
-            mutable.update { it.copy(status = "Autorizza l’accesso USB ad AMPED 3") }
+            mutable.update { it.copy(status = T("Autorizza l’accesso USB ad AMPED 3", "Allow USB access to AMPED 3")) }
             val flags = PendingIntent.FLAG_UPDATE_CURRENT or if (Build.VERSION.SDK_INT >= 31) PendingIntent.FLAG_MUTABLE else 0
             manager.requestPermission(d, PendingIntent.getBroadcast(context, 0, Intent(permissionAction).setPackage(context.packageName), flags))
         }
@@ -95,7 +95,7 @@ class AmpedMidiController(private val context: Context) {
                 request = UsbRequest().also { check(it.initialize(conn, ep)) }
                 queued = false
                 savedReports.clear()
-                mutable.update { AmpState(connected = true, status = "Lettura della pedaliera…", logs = it.logs) }
+                mutable.update { AmpState(connected = true, status = T("Lettura della pedaliera…", "Reading the pedal…"), logs = it.logs) }
                 log("HID ${iface.id}, endpoint ${ep.address}, packet ${ep.maxPacketSize}")
                 startSync()
                 for (slot in 1..3) for (kind in listOf(0x14,0x15,4,5)) write(AmpedProtocol.packet(2,kind,slot,0))
@@ -103,14 +103,14 @@ class AmpedMidiController(private val context: Context) {
                     commands.poll()?.invoke()
                     readReport()?.let(::receive)
                     val now = System.currentTimeMillis()
-                    if (pendingDsp != null && now > dspDeadline) error("Timeout trasferimento CabRig. Ricollega USB per rileggere lo stato.")
+                    if (pendingDsp != null && now > dspDeadline) error(T("Timeout trasferimento CabRig. Ricollega USB per rileggere lo stato.", "CabRig transfer timed out. Reconnect USB to reread the state."))
                     if (syncDeadline > 0 && now > syncDeadline) {
                         syncDeadline = 0
-                        mutable.update { it.copy(synced = false, busy = false, status = "Nessuna risposta completa. Tocca Sincronizza.") }
+                        mutable.update { it.copy(synced = false, busy = false, status = T("Nessuna risposta completa. Tocca Sincronizza.", "No complete response. Tap Sync.")) }
                     }
                 }
             } catch (e: Exception) {
-                if (running.get()) { log("Errore: ${e.message}"); mutable.update { it.copy(connected = false, synced = false, busy = false, status = e.message ?: "Errore USB") } }
+                if (running.get()) { log("Errore: ${e.message}"); mutable.update { it.copy(connected = false, synced = false, busy = false, status = e.message ?: T("Errore USB", "USB error")) } }
             } finally {
                 running.set(false)
                 runCatching { request?.cancel() }; runCatching { request?.close() }
@@ -140,7 +140,7 @@ class AmpedMidiController(private val context: Context) {
     }
     private fun startSync() {
         syncDeadline = System.currentTimeMillis() + 4000
-        mutable.update { it.copy(synced = false, amp = List(52){-1}, cab = List(84){-1}, status = "Sincronizzazione…") }
+        mutable.update { it.copy(synced = false, amp = List(52){-1}, cab = List(84){-1}, status = T("Sincronizzazione…", "Syncing…")) }
         write(AmpedProtocol.packet(7))
         write(AmpedProtocol.packet(2,0x16,0,0)); write(AmpedProtocol.packet(2,6,0,0))
     }
@@ -164,7 +164,7 @@ class AmpedMidiController(private val context: Context) {
                 chunk.values.forEachIndexed { i, v -> values[chunk.offset+i] = v }
                 val updated = if (chunk.cab) s.copy(cab = values) else s.copy(amp = values)
                 val complete = updated.amp.none { it < 0 } && updated.cab.none { it < 0 }
-                if (complete) { syncDeadline = 0; updated.copy(synced = true, busy = false, status = "AMPED 3 sincronizzata") } else updated
+                if (complete) { syncDeadline = 0; updated.copy(synced = true, busy = false, status = T("AMPED 3 sincronizzata", "AMPED 3 in sync")) } else updated
             }
         }
         if (cmd == 2) {
@@ -205,7 +205,7 @@ class AmpedMidiController(private val context: Context) {
             mutable.update { it.copy(cabSlot = slot) }
             return
         }
-        mutable.update { it.copy(busy = true, status = "Cambio CabRig…") }
+        mutable.update { it.copy(busy = true, status = T("Cambio CabRig…", "Changing CabRig…")) }
         commands.offer { write(AmpedProtocol.packet(2,1,slot,0)) }
     }
     fun recallAmp(slot: Int) {
@@ -214,17 +214,17 @@ class AmpedMidiController(private val context: Context) {
             mutable.update { it.copy(ampSlot = slot) }
             return
         }
-        mutable.update { it.copy(busy = true, status = "Cambio canale…") }
+        mutable.update { it.copy(busy = true, status = T("Cambio canale…", "Changing channel…")) }
         commands.offer { write(AmpedProtocol.packet(2,0x11,slot,0)); startSync() }
     }
     private fun profile(cab: Int, mic: Int, axis: Int): JSONObject? = (0 until profiles.length()).map { profiles.getJSONObject(it) }.firstOrNull { it.getInt("cab")==cab && it.getInt("mic")==mic && it.getInt("axis")==axis }
     fun chooseCab(cab: Int, mic: Int, axis: Int) {
         if (!state.value.synced || state.value.busy) return
         val p = profile(cab,mic,axis) ?: run {
-            mutable.update { it.copy(status = "Profilo DSP non disponibile") }
+            mutable.update { it.copy(status = T("Profilo DSP non disponibile", "DSP profile not available")) }
             return
         }
-        mutable.update { it.copy(busy = true, status = "Caricamento CabRig…") }
+        mutable.update { it.copy(busy = true, status = T("Caricamento CabRig…", "Loading CabRig…")) }
         commands.offer { transfer(p) }
     }
     fun applyEqPreset(name: String) {
@@ -247,7 +247,7 @@ class AmpedMidiController(private val context: Context) {
             if (matches(report)) return report
             receive(report)
         }
-        error("Timeout risposta USB: salvataggio non confermato")
+        error(T("Timeout risposta USB: salvataggio non confermato", "USB response timed out: save not confirmed"))
     }
     private fun readStored(cab: Boolean, slot: Int): Map<String, String> {
         val result = linkedMapOf<String, String>()
@@ -259,16 +259,16 @@ class AmpedMidiController(private val context: Context) {
                 result["$kind:$count"] = AmpedProtocol.hex(b.copyOfRange(4, 4 + count))
             }
         }
-        check(result.size == if (cab) 3 else 2) { "Backup slot incompleto" }
+        check(result.size == if (cab) 3 else 2) { T("Backup slot incompleto", "Incomplete slot backup") }
         return result
     }
     private fun saveHardware(cab: Boolean, slot: Int, name: String) {
         if (!state.value.synced || state.value.busy || slot !in 1..3) return
         val snapshot = state.value
         val encodedName = try { AmpedProtocol.saveNamePacket(cab, slot, name) } catch (e: IllegalArgumentException) {
-            mutable.update { it.copy(status = e.message ?: "Nome non valido") }; return
+            mutable.update { it.copy(status = e.message ?: T("Nome non valido", "Invalid name")) }; return
         }
-        mutable.update { it.copy(busy = true, status = "Backup prima del salvataggio…") }
+        mutable.update { it.copy(busy = true, status = T("Backup prima del salvataggio…", "Backing up before saving…")) }
         commands.offer {
             try {
                 val previous = readStored(cab, slot)
@@ -301,7 +301,7 @@ class AmpedMidiController(private val context: Context) {
                 startSync()
             } catch (e: Exception) {
                 log("Salvataggio non confermato: ${e.message}")
-                mutable.update { it.copy(busy = false, synced = false, status = "Salvataggio non confermato: ${e.message}") }
+                mutable.update { it.copy(busy = false, synced = false, status = T("Salvataggio non confermato: ${e.message}", "Save not confirmed: ${e.message}")) }
             }
         }
     }
@@ -324,20 +324,20 @@ class AmpedMidiController(private val context: Context) {
     private fun persist(list: List<LocalPreset>) {
         val temp = File(context.filesDir,"presets.tmp")
         temp.writeText(JSONArray(list.map { it.json() }).toString(2))
-        check(temp.renameTo(presetsFile)) { "Salvataggio preset fallito" }
+        check(temp.renameTo(presetsFile)) { T("Salvataggio preset fallito", "Preset save failed") }
         presetsMutable.value = list
     }
     fun applyLocal(p: LocalPreset) {
         if (!state.value.synced || state.value.busy) return
         val coeff = profile(p.cab[0],p.cab[1],p.cab[2])
         if (coeff == null && p.cab.take(3) != state.value.cab.take(3)) {
-            mutable.update { it.copy(status = "Profilo microfono non acquisito: preset non applicato") }; return
+            mutable.update { it.copy(status = T("Profilo microfono non acquisito: preset non applicato", "Microphone profile not captured: preset not applied")) }; return
         }
-        mutable.update { it.copy(busy = true, status = "Caricamento ${p.name}…") }
+        mutable.update { it.copy(busy = true, status = T("Caricamento ${p.name}…", "Loading ${p.name}…")) }
         commands.offer {
             // Master and power are deliberately left at their current hardware setting.
             for (i in listOf(0,1,2,3,4,5,6,7,8,22,24,25,26,27,28)) write(AmpedProtocol.parameter(false,i,p.amp[i]))
-            for (i in listOf(70,73,77,81)) write(AmpedProtocol.parameter(true,i,p.cab[i]))
+            for (i in AmpedProtocol.cabEqBands) write(AmpedProtocol.parameter(true,i,p.cab[i]))
             if (coeff != null) transfer(coeff) else { mutable.update { it.copy(busy=false) }; startSync() }
         }
     }
@@ -346,9 +346,9 @@ class AmpedMidiController(private val context: Context) {
         .put("hardwareBackups",JSONArray(context.filesDir.listFiles()?.filter { it.name.startsWith("backup-") }?.map { JSONObject(it.readText()) } ?: emptyList<JSONObject>()))
         .toString(2)
     fun importData(data: String): String = runCatching {
-        require(data.length <= 2_000_000) { "File troppo grande" }
+        require(data.length <= 2_000_000) { T("File troppo grande", "File too large") }
         if (data.trim().startsWith("<?xml")) {
-            val name = Regex("<Name>(.*?)</Name>").find(data)?.groupValues?.get(1) ?: "Preset Importato"
+            val name = Regex("<Name>(.*?)</Name>").find(data)?.groupValues?.get(1) ?: T("Preset Importato", "Imported Preset")
             fun v(tag: String) = Regex("<"+tag+">([0-9-]+)</"+tag+">").find(data)?.groupValues?.get(1)?.toIntOrNull()
             
             val amp = state.value.amp.toMutableList()
@@ -411,7 +411,7 @@ class AmpedMidiController(private val context: Context) {
         running.set(false)
         runCatching { request?.cancel() }
         worker?.join(1500)
-        mutable.update { it.copy(connected=false,synced=false,busy=false,status="AMPED 3 scollegata") }
+        mutable.update { it.copy(connected=false,synced=false,busy=false,status=T("AMPED 3 scollegata", "AMPED 3 disconnected")) }
     }
     fun close() { disconnect(); if (registered) { context.unregisterReceiver(receiver); registered=false } }
 }

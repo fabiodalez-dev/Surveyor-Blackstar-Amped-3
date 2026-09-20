@@ -1,23 +1,13 @@
-🎸 Tired of needing a PC to tweak your Blackstar AMPED pedal? 📱🔌
+I reverse-engineered the CabRig format of the Blackstar AMPED 3, and it is not what everyone assumes.
 
-Hey everyone! If you own a Blackstar AMPED (like the Amped 3) and hate having to plug it into a computer just to change CabRig settings or adjust the deep EQ, I've got something for you. 
+Surveyor is a free, open-source Android app that controls the AMPED 3 over a USB-OTG cable: cabinets, microphones, deep EQ, low and high cut shown in real hertz instead of raw 0-255 values, presets saved on the phone. No laptop at rehearsal, no Architect, no desktop. The APK is on the GitHub releases page and you do not need Android Studio to use it.
 
-I’ve spent the last few weeks reverse-engineering the USB protocol and built Surveyor – a 100% free, open-source Android app that gives you full control of your amp directly from your phone using a simple USB-OTG cable! 
+The part I actually want to talk about is the cabinet engine. CabRig does not load impulse responses. There is not a single audio sample in the transfer: each cabinet, microphone and axis choice is 260 bytes of filter coefficients, sixteen small recursive filters in series plus one gain term, sent to the pedal with two layers of checksums. That is why it sounds like a cabinet without adding latency, and it is also why nobody could ever put a custom IR in one of these: the pedal has no convolution engine to feed.
 
-What it does right now:
-✅ Live Sync: Move a physical knob on the amp, it moves on the app. Move a slider on the app, your amp responds instantly.
-✅ Full CabRig Control: Access all hidden 288 CabRig combinations (24 cabs x 6 mics), room levels, and deep EQ cuts without a PC.
-✅ Mobile Presets: Import official Architect patches to your phone, edit them, and burn them directly to the hardware slots.
+So the question becomes a different one. Not "how do I upload my IR", but "can I compute the sixteen filters that match my IR". The repo now contains an offline tool that does exactly that: it takes a WAV impulse response and solves for the coefficients that follow its frequency curve, reusing the stable filter structure of a factory profile so the result cannot blow up, then rebuilds both checksums so the pedal accepts the packet. All 288 factory profiles are decoded and checked into the repo, which is what made the maths possible in the first place.
 
-🔥 THE BIG NEWS (The Future):
-While reverse-engineering the app, we completely cracked Blackstar’s proprietary CabRig DSP format! We discovered they don't use heavy WAV IRs, but an ultra-low latency architecture (a 16-biquad cascade using 65 float parameters). 
-Because we fully decoded this format and its checksums, we are currently experimenting with a tool that uses mathematical curve-fitting to convert ANY standard WAV IR into Blackstar's format. 
-Yes, this means true Custom IR support for the Amped series is technically possible and is in the works! 🤯
+To be straight about where this stands: the format, the checksums and the transfer are verified on my own unit, including loading a profile and restoring the original state byte for byte, with all six factory slots untouched. The sound of a converted IR is not verified yet. I still have to measure the pedal output against the model with a frequency sweep, and a sixteen-filter model will never reproduce a long reverb tail, so this is a tool for cabinet and EQ curves, not a magic IR loader. Anyone trying it should back up their slots first and load into the live DSP without saving.
 
-You don't need Android Studio to use it. Just grab the APK from the GitHub releases and plug in your amp!
-We also gladly accept Issues and Pull Requests on GitHub if you find bugs or want to contribute to the DSP reverse-engineering! 🛠️
+I own an AMPED 3 and nothing else, so the 1 and the 2 are untested rather than supported. If you have one, or a measurement microphone and an hour to spare, that is the help this project needs.
 
-👇 Download the App & Read the technical deep-dive here:
 https://github.com/fabiodalez-dev/Surveyor-Blackstar-Amped-3
-
-(Check out the screenshot of the UI below!)

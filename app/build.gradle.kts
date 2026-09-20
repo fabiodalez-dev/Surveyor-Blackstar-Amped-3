@@ -11,8 +11,8 @@ android {
         applicationId = "com.example.amped3controller"
         minSdk = 26
         targetSdk = 36
-        versionCode = 2
-        versionName = "0.2-hid-test"
+        versionCode = 3
+        versionName = "1.2.0"
     }
 
     buildTypes {

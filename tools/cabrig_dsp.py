@@ -56,7 +56,13 @@ def encode(template, values):
     assert len(values) == 65 and all(math.isfinite(v) for v in values)
     data = struct.pack('<65f', *values)
     quantized = list(struct.unpack('<65f', data))
-    assert max(map(abs, poles(quantized))) < 1, 'unstable quantized poles'
+    # Three factory profiles (7:5:0, 22:5:0, 22:5:1) quantise to 1+a1+a2 == 0 in one
+    # section: a real pole at exactly z=1, cancelled by that section's own zero there.
+    # A flat "< 1" rejects coefficient sets the hardware itself ships, so the rule is
+    # not to leave the source profile less stable than it already was.
+    ceiling = max(1.0, max(map(abs, poles(decode(template)))))
+    radius = max(map(abs, poles(quantized)))
+    assert radius <= ceiling, f'unstable quantized poles: {radius:.9f} > {ceiling:.9f}'
     header = bytearray(unwrap(template['header'], 0xaa))
     header[:2] = crc(data).to_bytes(2, 'little')
     header[2:4] = len(data).to_bytes(2, 'little')
