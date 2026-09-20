@@ -5,16 +5,9 @@
 Born out of the frustration of needing a desktop PC to modify CabRig settings or deep EQ parameters, Surveyor gives you full USB-OTG control of your amplifier directly from your Android phone or tablet.
 
 <div align="center">
-  <table>
-    <tr>
-      <td align="center"><b>Amp Controls</b><br><img src="docs/screen_amp.png" width="350"/></td>
-      <td align="center"><b>CabRig Settings</b><br><img src="docs/screen_cab.png" width="350"/></td>
-    </tr>
-    <tr>
-      <td align="center"><b>Preset Library</b><br><img src="docs/screen_presets.png" width="350"/></td>
-      <td align="center"><b>Settings & Sim</b><br><img src="docs/screen_settings.png" width="350"/></td>
-    </tr>
-  </table>
+  <img src="docs/screen_amp.png" width="700" alt="Amp Controls"/><br><br>
+  <img src="docs/screen_cab.png" width="700" alt="CabRig Settings"/><br><br>
+  <img src="docs/screen_presets.png" width="700" alt="Preset Library"/>
 </div>
 
 ---
@@ -71,11 +64,31 @@ These map 1:1 to the physical knobs on the pedal, with values ranging `0x00` (0)
 
 *Note: There are other offsets (7, 8, 9) involved in reverb, presence, and resonance depending on the specific patch or hidden Architect parameters.*
 
-### CabRig Parameters (`0xa9` and Bulk)
+### CabRig DSP Format & Custom IRs (`0xaa` Bulk Transfers)
 
-CabRig is handled differently. Architect generates a 260-byte DSP coefficient profile for each cabinet/microphone/axis choice. It is not raw audio or a conventional sampled IR. Architect sends it with a bulk transfer (`aa`, `ab`, `ac` reports); saving the Cab slot is a separate operation.
+CabRig is handled entirely differently from standard Amp parameters. Through reverse-engineering the USB packet captures and the JUCE-based Architect binary, we've cracked the proprietary CabRig DSP format.
 
-The checked-in `cab_profiles.json` contains the complete 24 × 6 × 2 matrix. `tools/extract_cab_profiles.py` rebuilds the asset from a HID capture and refuses to produce an output unless all 288 combinations are present with the expected `AB 0..4` request sequence and five 64-byte `AC` chunks.
+**The most significant discovery is that CabRig does NOT use conventional WAV Impulse Responses (IR) or long FIR convolution.**
+
+Instead, Architect generates a highly optimized **260-byte DSP coefficient profile** for each cabinet/microphone/axis choice. It sends this to the amp via a bulk transfer (one `0xaa` header and five `0xac` 64-byte chunks, protected by a big-endian **CRC-16/XMODEM**).
+
+#### The 65-Float Biquad Cascade
+The 260-byte payload consists entirely of **65 little-endian float32 values**:
+- 1 direct coefficient (gain/scaling).
+- 16 compact second-order recursive-filter sections (IIR Biquads) (16 sections × 4 floats = 64 floats).
+
+This explains the Amped 3's ultra-low latency: instead of processing heavy convolutions, it runs the signal through a cascade of 16 IIR biquad filters. This perfectly mimics the frequency magnitude and resonances of a physical guitar cabinet without the computational overhead of a room tail.
+
+#### Custom Sounds (IR Conversion)
+Because the format has been decoded, **it is technically possible to load custom IRs into the Amped 3**. 
+This is achieved via a process called **System Identification (IIR Filter Approximation)**:
+1. You take a traditional WAV IR (FIR).
+2. You use curve-fitting algorithms to calculate the 65 float32 coefficients that generate an identical EQ curve.
+3. To prevent the IIR filter from exploding (unstable poles), Surveyor's offline tools (`tools/cabrig_dsp.py`) use an experimental `--fit-ir` mode that fits the numerator weights against the *already stable* pole bank of an official Blackstar profile.
+
+This guarantees stability while allowing you to technically alter the profile to match your favorite external IRs! 
+
+The checked-in `cab_profiles.json` contains the complete factory 24 × 6 × 2 matrix (288 profiles). Surveyor performs a pre-save read and local fsync, waits for the CabRig acknowledgement, rereads the slot, and verifies its name and data to ensure 100% hardware safety during persistent storage operations.
 
 However, some specific post-EQ parameters can be manipulated individually via `0xa9` without a bulk transfer:
 
