@@ -14,12 +14,11 @@ Born out of the frustration of needing a desktop PC to modify CabRig settings or
 
 ## 🎸 Features
 
-- **Live USB-OTG Sync:** Connect your Android device directly to the AMPED 3 via USB. Bidirectional syncing means moving a physical knob on the amp instantly updates the app, and dragging a slider on the app instantly updates the amp.
-- **CabRig Deep Dive:** Access hidden parameters not available on the physical pedal. Swap between all 23 cabinets (plus DI), 6 microphones, toggle Axis, Stereo Width, Room Type, and master levels.
-- **Complete Cab/Mic Matrix:** The app includes all 288 DSP profiles exposed by Architect: 24 cabinet/DI choices × 6 microphones × On/Off Axis. Every profile was captured from Architect and validated as one header plus five complete DSP chunks.
-- **Logarithmic EQ Sweeps:** The Low-Cut and High-Cut filters have been mathematically mapped to display actual, usable frequencies (Hertz) instead of raw 0-255 MIDI values (e.g., Low-Cut from 20Hz to 400Hz).
-- **Physical "Tolex" Aesthetic:** The UI mimics the physical head. When you adjust the Gain, watch the slider track heat up with an intense, glowing tube-valve gradient!
-- **Preset Management (.amped & .cabrig):** Import official XML patches from Architect Desktop directly into your phone. Burn them into the 3 hardware slots, or keep an unlimited number of patches stored locally on your device!
+- **No Desktop PC Required:** Connect your Android device directly to the AMPED via USB-OTG. Features live, zero-latency bidirectional syncing with the physical hardware.
+- **CabRig DSP Protocol Decoded:** Surveyor includes all 288 factory CabRig DSP profiles, fully extracted and validated. More importantly, we cracked the proprietary 260-byte payload format, discovering it uses an ultra-fast 16-biquad recursive filter cascade (65 float32s) rather than heavy traditional convolutions.
+- **Custom IR Conversion Tools:** The repository includes offline Python tools (`tools/cabrig_dsp.py`) capable of mathematically converting standard WAV Impulse Responses into the Blackstar-compatible 65-float structure, opening the door to custom IRs on closed hardware.
+- **Deep Parameter Control:** Access hidden DSP parameters not available on the physical pedal. The Low-Cut and High-Cut filters have been mathematically mapped to display actual, usable frequencies (Hertz) instead of raw 0-255 MIDI values.
+- **Hardware-Safe Preset Management:** Fully documented the hardware slot saving process. Surveyor performs a pre-save read, local fsync, and post-write verification to safely burn `.amped` patches into the physical hardware slots without risking DSP corruption.
 
 ---
 
