@@ -14,11 +14,11 @@ Born out of the frustration of needing a desktop PC to modify CabRig settings or
 
 ## 🎸 Features
 
-- **No Desktop PC Required:** Connect your Android device directly to the AMPED via USB-OTG. Features live, zero-latency bidirectional syncing with the physical hardware.
-- **CabRig DSP Protocol Decoded:** Surveyor includes all 288 factory CabRig DSP profiles, fully extracted and validated. More importantly, we cracked the proprietary 260-byte payload format, discovering it uses an ultra-fast 16-biquad recursive filter cascade (65 float32s) rather than heavy traditional convolutions.
-- **Custom IR Conversion Tools:** The repository includes offline Python tools (`tools/cabrig_dsp.py`) capable of mathematically converting standard WAV Impulse Responses into the Blackstar-compatible 65-float structure, opening the door to custom IRs on closed hardware.
-- **Deep Parameter Control:** Access hidden DSP parameters not available on the physical pedal. The Low-Cut and High-Cut filters have been mathematically mapped to display actual, usable frequencies (Hertz) instead of raw 0-255 MIDI values.
-- **Hardware-Safe Preset Management:** Fully documented the hardware slot saving process. Surveyor performs a pre-save read, local fsync, and post-write verification to safely burn `.amped` patches into the physical hardware slots without risking DSP corruption.
+- **No Desktop PC Required:** Connect your Android device directly to the AMPED over USB-OTG. The app reads the amp's actual state on connect and re-reads it after every write, so the controls show hardware values instead of assumed ones. Round-trip latency has not been measured, and not every physical knob reports its movement on its own, so a manual resync covers that case.
+- **CabRig DSP Protocol Decoded:** Surveyor ships all 288 factory CabRig DSP profiles, extracted from captures of my own unit and validated against both checksum layers. I decoded the 260-byte payload format itself: it is a 16-section recursive filter cascade described by 65 float32 values, not a convolution of a stored impulse response.
+- **Custom Profile Tools (experimental):** The offline Python tool `tools/cabrig_dsp.py` builds structurally valid non-factory profiles: it rebuilds both checksum layers, verifies pole stability after float32 quantisation, and its `--fit-ir` mode fits a WAV impulse response by solving the 33 numerator weights over the fixed pole bank of a factory profile. The resulting packets are valid by construction; their sound has not been measured yet, so treat fitted profiles as an experiment, not a feature.
+- **Deep Parameter Control:** Access DSP parameters that the pedal itself does not expose, with the parameter map verified against the hardware rather than assumed ([docs/PROTOCOL_VERIFICATION.md](docs/PROTOCOL_VERIFICATION.md)). The Low-Cut and High-Cut controls are shown in approximate hertz rather than as raw 0-255 values; Architect itself displays only a 0-10 position, so those figures are an estimate and are printed with a leading `~`.
+- **Guarded Preset Management:** The hardware slot saving sequence is documented and exercised. Before writing, Surveyor reads the destination slot and fsyncs a local backup; after writing it waits for the acknowledgement, rereads the slot and compares name and data, and reports an explicit unconfirmed-save status if any of those steps fails. Current coverage and its limits are in [docs/STORAGE_VERIFICATION.md](docs/STORAGE_VERIFICATION.md): CabRig verification covers all 84 bytes, AMP verification covers the first nine continuous parameters, and a power-cycle retention test is still pending.
 
 ---
 
@@ -49,62 +49,96 @@ Example for setting a CAB parameter:
 
 ### Amp Parameters (`0x16`)
 
-These map 1:1 to the physical knobs on the pedal, with values ranging `0x00` (0) to `0x7f` (127):
+These are the continuous parameters of the 52-byte live AMP block, each a single byte from `0x00` (0) to `0x7f` (127). Some correspond to a physical knob, others exist only in Architect:
 
-| Offset (Dec) | Offset (Hex) | Parameter Name | Range |
-|--------------|--------------|----------------|-------|
-| 0            | 0x00         | Gain           | 0-127 |
-| 1            | 0x01         | Bass           | 0-127 |
-| 2            | 0x02         | Middle         | 0-127 |
-| 3            | 0x03         | Treble         | 0-127 |
-| 4            | 0x04         | ISF            | 0-127 |
-| 5            | 0x05         | Response/Power | 0-127 |
-| 6            | 0x06         | Master Volume  | 0-127 |
+| Offset (Dec) | Offset (Hex) | Parameter Name  | Range |
+|--------------|--------------|-----------------|-------|
+| 0            | 0x00         | Gain            | 0-127 |
+| 1            | 0x01         | Preamp Volume   | 0-127 |
+| 2            | 0x02         | Boost Level     | 0-127 |
+| 3            | 0x03         | Reverb Level    | 0-127 |
+| 4            | 0x04         | Bass            | 0-127 |
+| 5            | 0x05         | Middle          | 0-127 |
+| 6            | 0x06         | Treble          | 0-127 |
+| 7            | 0x07         | ISF             | 0-127 |
+| 8            | 0x08         | Presence        | 0-127 |
+| 9            | 0x09         | Master Volume   | 0-127 |
 
-*Note: There are other offsets (7, 8, 9) involved in reverb, presence, and resonance depending on the specific patch or hidden Architect parameters.*
+All ten were **verified on the hardware on 20 September 2026** by reading the ten knob values Architect displays and matching them against the pedal's own 52-byte live block: each knob was compatible with exactly one offset, with every residual below half a step, and nothing was written to the amp to establish it. The method and the residuals are in [docs/PROTOCOL_VERIFICATION.md](docs/PROTOCOL_VERIFICATION.md).
+
+Switch offsets, each confirmed against what Architect showed at the same moment:
+
+| Offset (Dec) | Offset (Hex) | Parameter        | Observed values |
+|--------------|--------------|------------------|-----------------|
+| 21           | 0x15         | Power            | 1 = 100 W confirmed; 2 and 3 are 1 W / 20 W in some order |
+| 22           | 0x16         | Response (valve) | 1 = 6L6, 2 = EL84, 3 = EL34 |
+| 24           | 0x18         | Boost Position   | 0 = Post, 1 = Pre |
+| 25           | 0x19         | Reverb Character | 0 = Light, 1 = Dark |
+| 26           | 0x1a         | Clean Voice      | 0 = Bright, 1 = Warm |
+| 27           | 0x1b         | Crunch Voice     | 0 = Super Crunch, 1 = Crunch |
+| 28           | 0x1c         | OD Voice         | 0 = OD2, 1 = OD1 |
+| 32           | 0x20         | Channel + boost  | Bit 6 (64) is Boost, writable and verified. The low bits track the channel; 1, 8 and 32 were all observed and the encoding is not settled |
+| 33           | 0x21         | Reverb on/off    | 0 or 1 |
+
+Power is not exposed in the UI because only the 100 W value is pinned down. Offsets 10, 23, 40 and 41 hold unidentified state; 32 and 41 ignore writes and report values of the amp's own choosing. Preset import restores the continuous parameters, response and the two character switches, and skips channel/voice selection — the code says so explicitly rather than pretending otherwise.
 
 ### CabRig DSP Format & Custom IRs (`0xaa` Bulk Transfers)
 
-CabRig is handled entirely differently from standard Amp parameters. Through reverse-engineering the USB packet captures and the JUCE-based Architect binary, we've cracked the proprietary CabRig DSP format.
+CabRig is handled entirely differently from standard Amp parameters. By capturing the USB traffic of my own unit and disassembling the coefficient routine of the JUCE-based Architect binary, I reconstructed the CabRig DSP format.
 
 **The most significant discovery is that CabRig does NOT use conventional WAV Impulse Responses (IR) or long FIR convolution.**
 
-Instead, Architect generates a highly optimized **260-byte DSP coefficient profile** for each cabinet/microphone/axis choice. It sends this to the amp via a bulk transfer (one `0xaa` header and five `0xac` 64-byte chunks, protected by a big-endian **CRC-16/XMODEM**).
+Instead, Architect generates a highly optimized **260-byte DSP coefficient profile** for each cabinet/microphone/axis choice. It sends this to the amp via a bulk transfer of one `0xaa` header plus five `0xac` chunks. Every report is 64 bytes and carries a big-endian **CRC-16/XMODEM** of its own payload in bytes 1-2 and that payload's length in byte 3, with data from byte 4. The header additionally carries the CRC of the reassembled 260 bytes in little-endian order, the length 260, and the chunk count 5. All 288 captured profiles pass both levels.
 
 #### The 65-Float Biquad Cascade
 The 260-byte payload consists entirely of **65 little-endian float32 values**:
 - 1 direct coefficient (gain/scaling).
 - 16 compact second-order recursive-filter sections (IIR Biquads) (16 sections × 4 floats = 64 floats).
 
-This explains the Amped 3's ultra-low latency: instead of processing heavy convolutions, it runs the signal through a cascade of 16 IIR biquad filters. This perfectly mimics the frequency magnitude and resonances of a physical guitar cabinet without the computational overhead of a room tail.
+This is consistent with the pedal's low latency: sixteen biquads in cascade approximate the magnitude response and the resonances of a cabinet for a small fraction of the cost of a convolution, and give up the long room tail in exchange. Supporting evidence from the binary: it contains `DSP_BLOCK_BiquadFilter_init`, `DSP_Block_BiquadFilter.c` and `CabRigCoeffsBase`, and the disassembled conversion routine caps at sixteen sections of four input floats each.
 
-#### Custom Sounds (IR Conversion)
-Because the format has been decoded, **it is technically possible to load custom IRs into the Amped 3**. 
-This is achieved via a process called **System Identification (IIR Filter Approximation)**:
-1. You take a traditional WAV IR (FIR).
-2. You use curve-fitting algorithms to calculate the 65 float32 coefficients that generate an identical EQ curve.
-3. To prevent the IIR filter from exploding (unstable poles), Surveyor's offline tools (`tools/cabrig_dsp.py`) use an experimental `--fit-ir` mode that fits the numerator weights against the *already stable* pole bank of an official Blackstar profile.
+#### Custom profiles from an IR (experimental)
 
-This guarantees stability while allowing you to technically alter the profile to match your favorite external IRs! 
+The pedal has no convolution engine, so there is no such thing as uploading a WAV to it. What the decoded format makes possible is computing a cabinet's worth of coefficients yourself, which is the useful half of the same wish. The approach is plain system identification against a fixed pole bank:
 
-The checked-in `cab_profiles.json` contains the complete factory 24 × 6 × 2 matrix (288 profiles). Surveyor performs a pre-save read and local fsync, waits for the CabRig acknowledgement, rereads the slot, and verifies its name and data to ensure 100% hardware safety during persistent storage operations.
+1. Start from a factory profile and keep its denominators, which are the part that determines stability.
+2. Transform the target WAV impulse response and solve, by complex least squares, for the 33 real numerator weights: one direct term plus two per section.
+3. Re-derive the poles from the quantised float32 result and refuse to emit anything whose poles left the unit circle.
+4. Rebuild both checksum layers so the amp accepts the packet.
+
+`tools/cabrig_dsp.py` does all four steps offline and never opens the USB device. Because step 1 never touches the denominators, the fit cannot produce an unstable filter; that is a structural guarantee about the filter, not a claim about how it sounds. The tool reports the relative complex fit error and the predicted peak gain in dB, and marks its own output `hardware_audio_validation: false`.
+
+```bash
+python3 tools/cabrig_dsp.py app/src/main/assets/cab_profiles.json --key 21:5:0 --fit-ir mycab.wav --output /tmp/custom-cab.json
+```
+
+What is not yet established: the 48 kHz sample rate is an assumption the tool labels as such, not a rate read off the hardware, and the section ordering, summation topology and gain normalisation are inferred from the disassembly and the payload layout rather than confirmed by a measured sweep. A pole bank borrowed from one cabinet also cannot represent an arbitrary long-delay impulse response however well the numerators are solved, so this is a tool for cabinet and EQ curves, not a general IR loader. Back up all six slots first, load into the live DSP only, and restore without saving if anything sounds or measures wrong. See [docs/CABRIG_DSP_FORMAT.md](docs/CABRIG_DSP_FORMAT.md) for the full account.
+
+The checked-in `cab_profiles.json` contains the complete factory 24 × 6 × 2 matrix (288 choices, 276 distinct payloads, since a few choices intentionally share data).
 
 However, some specific post-EQ parameters can be manipulated individually via `0xa9` without a bulk transfer:
 
 | Offset (Dec) | Offset (Hex) | Parameter Name     | Range   | Notes |
 |--------------|--------------|--------------------|---------|-------|
 | 57           | 0x39         | Room Level         | 0-127   | Maxes out at 0x7F! |
-| 67           | 0x43         | High-Cut Frequency | 0-255   | 0 = 2kHz, 255 = 20kHz (Logarithmic) |
-| 83           | 0x53         | Low-Cut Frequency  | 0-255   | 0 = 20Hz, 255 = 400Hz (Logarithmic) |
+| 3            | 0x03         | Cabinet Level      | 0-127   | ±12 dB; not exposed in the app yet |
+| 65           | 0x41         | Master Level       | 0-255   | |
 | 66           | 0x42         | Low-Cut Toggle     | 0-1     | 0 = Off, 1 = On |
+| 67           | 0x43         | **Low-Cut Frequency**  | 0-255   | Rises with the value; the hertz the app prints are an uncalibrated estimate |
+| 70, 73, 77, 81 | –          | EQ Low, Low Mids, High Mids, High | 0-255 | dB = (raw − 127.5) / 12.75, which reproduces all four Architect readouts |
 | 82           | 0x52         | High-Cut Toggle    | 0-1     | 0 = Off, 1 = On |
+| 83           | 0x53         | **High-Cut Frequency** | 0-255   | Falls as the cut gets more aggressive; same estimate caveat |
 
-*Important discovery: Do not send values > 127 to the Room Level offset (57), as the physical DSP clips at 127 (`0x7F`). Surveyor handles this internally to prevent DSP overflow.*
+*The two cut frequencies were swapped in this document and in the app until 20 September 2026: the control labelled Low-Cut wrote offset 83. Moving one Architect control at a time with the traffic captured showed which is which, and the factory EQ presets agree — "Cocked Wah" keeps only midrange with 67 at 255 and 83 at 17. Architect never displays a frequency, only a 0-10 knob position, so the hertz values shown in the app are a plausible mapping, not a measured one.*
+
+*Observed behaviour: the Room Level offset (57) stops responding above 127 (`0x7F`) even though the field is a byte, so Surveyor clamps it there rather than sending values the DSP ignores.*
 
 ### Hardware Interaction & Slot Switching
 To change channels (slots), send `0x11` (Amp slots) or `0x01` (Cab slots) encapsulated in a `0x02` (System) command:
-- `02 11 01 00` -> Change to AMP Slot 1 (Clean)
-- `02 01 02 00` -> Change to CAB Slot 2
+- `02 11 01 00` -> Recall AMP Slot 1 (Clean). Verified independently: after sending it for slot 2 the live parameters became exactly that slot's stored bytes, while Master stayed put because the 15-byte stored format does not include it. That format is bytes 0-8 of the live block in order, then power at byte 10 and valve response at byte 11.
+- `02 01 02 00` -> Change to CAB Slot 2. Present in the captures (`research/eq_sniff.log`) but not yet exercised on its own outside Architect, so treat it as observed rather than verified.
+
+Architect pads these reports with an uninitialised tail beyond the declared length. Do not copy those bytes: send zero padding.
 
 ---
 

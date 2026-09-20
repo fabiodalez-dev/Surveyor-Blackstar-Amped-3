@@ -10,6 +10,12 @@ The assembled 260-byte payload is 65 little-endian float32 values. The first two
 
 Architect's binary contains `DSP_BLOCK_BiquadFilter_init`, `DSP_Block_BiquadFilter.c`, `ercoefs` and `CabRigCoeffsBase`. Disassembly of the coefficient conversion routine shows at most 16 sections, four input floats per section, and a transform using cosine and multiplication by -2. Together with the 65-float payload, this identifies one direct coefficient plus sixteen compact second-order recursive-filter sections. The payload does **not** contain PCM samples, a WAV file, or a conventional long convolution IR.
 
+## Three factory profiles sit exactly on the unit circle
+
+Checking every profile's poles turned up three — 7:5:0, 22:5:0 and 22:5:1 — whose section 15 quantises to `1 + a1 + a2 == 0` in float32 (a1 = −1.99995744, a2 = +0.99995744). The denominator is therefore exactly zero at z = 1: a real pole sitting on the unit circle, not outside it. In each case the section's own numerator satisfies `b0 + b1 ≈ 0` to within 1e-10, so a zero at z = 1 cancels it. These are extremely high-Q resonators near DC, and the hardware plays them every day.
+
+This matters because the tool used to reject them. Its rule was a flat "every pole strictly inside the unit circle", which refuses coefficient sets Blackstar itself ships. The rule is now: the output may not be less stable than the profile it came from. Clearly unstable coefficients are still refused, and a marginal template does not license making it worse — `tools/test_cabrig_dsp.py` checks all four cases.
+
 ## What can safely be changed
 
 `tools/cabrig_dsp.py` decodes and validates captured profiles, checks pole stability after float32 quantisation, changes numerator gain, and rebuilds every checksum. It works offline and never opens the USB device. Example:
