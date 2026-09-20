@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Blackstar Amped 3 -->
+    <usb-device vendor-id="10196" product-id="114" />
+</resources>
