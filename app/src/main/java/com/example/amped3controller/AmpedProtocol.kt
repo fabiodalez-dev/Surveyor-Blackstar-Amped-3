@@ -18,8 +18,19 @@ object AmpedProtocol {
     const val CAB_HIGH_CUT_ON = 82
     const val CAB_HIGH_CUT_FREQ = 83
     val cabEqBands = listOf(70, 73, 77, 81)
+    /** CabRig offsets a local preset restores: the four EQ bands, both cut filters and the two
+     *  levels whose meaning is verified. The Master level is deliberately excluded, like the
+     *  amplifier's Master: loading a preset should not change how loud the rig is. */
+    val cabPresetOffsets = cabEqBands + listOf(
+        CAB_CABINET_LEVEL, CAB_ROOM_LEVEL, CAB_LOW_CUT_ON, CAB_LOW_CUT_FREQ, CAB_HIGH_CUT_ON, CAB_HIGH_CUT_FREQ)
     /* AMP offsets 0..9 verified the same day by correlating the live block with the values
        Architect displayed for each knob; every knob matched exactly one offset. */
+    /** Cabinet and Room level bytes as decibels. Calibrated on 2026-09-21 by stepping the
+     *  Architect sliders one notch at a time and pairing each readout with the byte sent:
+     *  77 -> 2.6 dB, 85 -> 4.1 dB, 71 -> 1.4 dB, 76 -> 2.4 dB and every step between.
+     *  The Master level (offset 65) uses a different, non-linear fader taper and is left raw. */
+    fun levelDb(raw: Int) = raw * 24.0 / 127.0 - 12.0
+
     const val AMP_STATUS = 32
     const val AMP_BOOST_BIT = 64
     const val AMP_REVERB_ON = 33
