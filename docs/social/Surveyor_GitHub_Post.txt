@@ -1,0 +1,27 @@
+Surveyor: Open-Source Android Controller for Blackstar AMPED (Reverse Engineered!)
+
+Hello fellow developers and guitarists!
+
+I want to share Surveyor, an open-source, mobile-first alternative to the official Blackstar "Architect" desktop software. I built this specifically for the Blackstar AMPED 3 (though it should be adaptable to the AMPED 1 and 2), because I was frustrated with needing a laptop just to tweak the CabRig settings or adjust the deep EQ at a gig.
+
+Repo & APK Download: https://github.com/fabiodalez-dev/Surveyor-Blackstar-Amped-3
+
+--- What is Surveyor? ---
+It’s an Android app built with Kotlin and Jetpack Compose. You connect your phone to the pedal via USB-OTG, and it gives you full control.
+- Native MIDI Control: Standard amp parameters (Gain, EQ, Master) actually use standard MIDI CC under the hood! The app leverages android.media.midi to achieve zero-latency bidirectional sync with the physical knobs.
+- CabRig Matrix: Access all 288 factory combinations (24 cabinets x 6 microphones x Axis).
+
+--- The Reverse Engineering Breakthrough: CabRig DSP ---
+The most exciting part of this project was reverse-engineering the proprietary USB HID protocol used for the CabRig simulations.
+
+Through USB packet sniffing and analyzing the JUCE-based Architect binary, we cracked the format:
+- No Convolutions: Blackstar does NOT use traditional WAV Impulse Responses (IRs).
+- The Format: The DSP payload is an ultra-optimized 260-byte binary chunk. It consists of 65 little-endian float32 values (1 direct coefficient + 16 compact IIR biquad sections).
+- Integrity Checks: The bulk transfer (0xAA header + five 0xAC chunks) is protected by a big-endian CRC-16/XMODEM.
+
+--- The Future: Custom IR Support! ---
+Because the 65-float format has been completely decoded, we can technically load custom IRs into the Amped pedal.
+Our offline Python tool (tools/cabrig_dsp.py) features an experimental --fit-ir mode. It uses System Identification curve-fitting to take a standard WAV IR and calculate the 65 float32 coefficients that generate an identical EQ curve. To guarantee that the recursive filters remain stable (and don't blow up the amp's speakers), the algorithm fits the numerators against an already-stable pole bank from an official profile.
+
+If you are a DSP nerd or a guitarist looking to hack your Blackstar pedal, come check out the repo, read the technical documentation, and feel free to contribute! 
+We gladly accept Issues and Pull Requests on GitHub to fix bugs, test the Amped 1/2 compatibility, or improve the IR conversion algorithm! 🛠️

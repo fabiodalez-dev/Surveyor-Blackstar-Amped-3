@@ -1,0 +1,23 @@
+🎸 Tired of needing a PC to tweak your Blackstar AMPED pedal? 📱🔌
+
+Hey everyone! If you own a Blackstar AMPED (like the Amped 3) and hate having to plug it into a computer just to change CabRig settings or adjust the deep EQ, I've got something for you. 
+
+I’ve spent the last few weeks reverse-engineering the USB protocol and built Surveyor – a 100% free, open-source Android app that gives you full control of your amp directly from your phone using a simple USB-OTG cable! 
+
+What it does right now:
+✅ Live Sync: Move a physical knob on the amp, it moves on the app. Move a slider on the app, your amp responds instantly.
+✅ Full CabRig Control: Access all hidden 288 CabRig combinations (24 cabs x 6 mics), room levels, and deep EQ cuts without a PC.
+✅ Mobile Presets: Import official Architect patches to your phone, edit them, and burn them directly to the hardware slots.
+
+🔥 THE BIG NEWS (The Future):
+While reverse-engineering the app, we completely cracked Blackstar’s proprietary CabRig DSP format! We discovered they don't use heavy WAV IRs, but an ultra-low latency architecture (a 16-biquad cascade using 65 float parameters). 
+Because we fully decoded this format and its checksums, we are currently experimenting with a tool that uses mathematical curve-fitting to convert ANY standard WAV IR into Blackstar's format. 
+Yes, this means true Custom IR support for the Amped series is technically possible and is in the works! 🤯
+
+You don't need Android Studio to use it. Just grab the APK from the GitHub releases and plug in your amp!
+We also gladly accept Issues and Pull Requests on GitHub if you find bugs or want to contribute to the DSP reverse-engineering! 🛠️
+
+👇 Download the App & Read the technical deep-dive here:
+https://github.com/fabiodalez-dev/Surveyor-Blackstar-Amped-3
+
+(Check out the screenshot of the UI below!)
