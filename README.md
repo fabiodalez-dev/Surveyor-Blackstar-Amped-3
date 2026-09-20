@@ -110,8 +110,6 @@ To change channels (slots), send `0x11` (Amp slots) or `0x01` (Cab slots) encaps
 
 ## 🚀 Installation
 
-You don't need Android Studio or a PC to install Surveyor! 
-
 1. Go to the **[Releases](../../releases/latest)** page on this GitHub repository.
 2. Download the latest `Surveyor-vX.X.X.apk` file directly to your Android device.
 3. Open the downloaded APK and tap **Install** (you may need to allow "Install from Unknown Sources" in your Android settings).
