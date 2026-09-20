@@ -68,6 +68,24 @@ class AmpedMidiController(private val context: Context) {
         if (!backup.exists()) backup.writeText(context.assets.open("original_backup.json").bufferedReader().use { it.readText() })
     }
     private fun log(s: String) { mutable.update { it.copy(logs = (s + "\n" + it.logs).take(12000)) } }
+        fun simulateConnection() {
+        mutable.update { 
+            val amp = IntArray(52) { 0 }
+            val cab = IntArray(92) { 0 }
+            amp[0] = 50; amp[1] = 70; amp[2] = 20; amp[3] = 40; amp[4] = 64; amp[5] = 64; amp[6] = 64; amp[7] = 100; amp[8] = 50; amp[9] = 100
+            amp[22] = 1; amp[26] = 1; amp[27] = 1; amp[28] = 1; amp[32] = 64; amp[33] = 1
+            cab[0] = 4; cab[1] = 2; cab[2] = 0; cab[65] = 80; cab[83] = 50
+            cab[70] = 128; cab[73] = 128; cab[77] = 128; cab[81] = 128
+            it.copy(
+                connected = true, synced = true, busy = false,
+                ampSlot = 2, cabSlot = 1,
+                amp = amp.toList(), cab = cab.toList(),
+                ampNames = mapOf(1 to "Clean Dream", 2 to "Heavy Crunch", 3 to "Lead Solo"),
+                cabNames = mapOf(1 to "V30 4x12", 2 to "Greenback 2x12", 3 to "Fender 1x12"),
+                status = "SIMULAZIONE ATTIVA"
+            )
+        }
+    }
     fun connectToAmp() {
         if (running.get()) { refresh(); return }
         val d = manager.deviceList.values.firstOrNull { it.vendorId == AmpedProtocol.VID && it.productId == AmpedProtocol.PID }
@@ -188,15 +206,31 @@ class AmpedMidiController(private val context: Context) {
     fun refresh() { if (running.get() && !state.value.busy) commands.offer { startSync() } }
     fun setParameter(cab: Boolean, offset: Int, value: Int) {
         if (!state.value.synced || state.value.busy) return
+        if (connection == null) {
+            mutable.update { s ->
+                val v = (if(cab) s.cab else s.amp).toMutableList()
+                if(offset in v.indices) v[offset] = value
+                if (cab) s.copy(cab = v) else s.copy(amp = v)
+            }
+            return
+        }
         commands.offer { write(AmpedProtocol.parameter(cab,offset,value)); startSync() }
     }
         fun recallCab(slot: Int) {
         if (!state.value.synced || state.value.busy) return
+        if (connection == null) {
+            mutable.update { it.copy(cabSlot = slot) }
+            return
+        }
         mutable.update { it.copy(busy = true, status = "Cambio CabRig…") }
         commands.offer { write(AmpedProtocol.packet(2,1,slot,0)) }
     }
     fun recallAmp(slot: Int) {
         if (!state.value.synced || state.value.busy) return
+        if (connection == null) {
+            mutable.update { it.copy(ampSlot = slot) }
+            return
+        }
         mutable.update { it.copy(busy = true, status = "Cambio canale…") }
         commands.offer { write(AmpedProtocol.packet(2,0x11,slot,0)); startSync() }
     }

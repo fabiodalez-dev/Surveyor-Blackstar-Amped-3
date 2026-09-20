@@ -1,29 +1,43 @@
-# Surveyor for Blackstar Amped 3
+# Surveyor (Blackstar AMPED 3 Controller)
 
-*Because while the "Architects" stay in the office (Mac/Windows), the "Surveyors" do the actual work on the field (Android).*
+**Surveyor** is an open-source, mobile-first alternative to the official Blackstar "Architect" desktop software, specifically reverse-engineered and built for the **Blackstar AMPED 3** 100W pedal.
 
-## The Story
-Blackstar released the amazing Amped 3, a 100W 3-channel pedalboard amplifier. They also provided an official desktop software called **Architect** to tweak the deep DSP settings, CabRig emulations, and EQ biases. 
+Born out of the frustration of needing a desktop PC to modify CabRig settings or deep EQ parameters, Surveyor gives you full USB-OTG control of your amplifier directly from your Android phone or tablet.
 
-But what if you are on a stage or in a rehearsal room and all you have is your Android phone? You can't run Architect. You are left entirely in the dark. There is no official Android app. 
+<div align="center">
+  <img src="docs/screen_amp.png" width="200"/>
+  <img src="docs/screen_cab.png" width="200"/>
+  <img src="docs/screen_presets.png" width="200"/>
+  <img src="docs/screen_settings.png" width="200"/>
+</div>
 
-So, we reversed-engineered the entire proprietary USB HID protocol of the Amped 3, sniffed the packets, mathematically mapped the offsets of every single DSP parameter (and discovered some funny bugs in their logic along the way), and built **Surveyor**.
+## Features
 
-## What it does
-Surveyor is a blazing-fast, native Jetpack Compose Android app that talks directly to your Amped 3 via a USB OTG cable.
+- **Live USB-OTG Sync:** Connect your Android device directly to the AMPED 3 via USB. Bidirectional syncing means moving a physical knob on the amp instantly updates the app, and dragging a slider on the app instantly updates the amp.
+- **CabRig Deep Dive:** Access hidden parameters not available on the physical pedal. Swap between all 23 Cabinets, 6 Microphones, toggle Axis, Stereo Width, Room Type, and master levels.
+- **Logarithmic EQ Sweeps:** The Low-Cut and High-Cut filters have been mathematically mapped to display actual, usable frequencies (Hertz) instead of raw 0-255 MIDI values (e.g., Low-Cut from 20Hz to 400Hz).
+- **Physical "Tolex" Aesthetic:** The UI mimics the physical head. When you adjust the Gain, watch the slider track heat up with an intense, glowing tube-valve gradient!
+- **Simulation Mode:** No amp nearby? Tap "Simula" in the settings to activate *Ghost Mode*. The UI instantly unlocks with simulated dummy data, allowing you to build patches, test layouts, and review EQ settings offline.
+- **Preset Management (.amped & .cabrig):** Import official XML patches from Architect Desktop directly into your phone. Burn them into the 3 hardware slots, or keep an unlimited number of patches stored locally on your device!
 
-- **Full Amp Control**: Tweak Gain, Volume, EQ (Bass, Middle, Treble, ISF), Master, and Presence in real-time.
-- **Deep Voice Editing**: Change the power amp response (EL84, EL34, 6L6), Reverb character (Dark/Light), and Pre/Post boost routing.
-- **CabRig Mastery**: Select all 24 cabinets, all 6 microphones, tweak Room levels, Stereo Width, and Master EQ.
-- **Hardware Saving**: Burn your presets directly into the pedal's EEPROM flash memory without ever touching a PC.
-- **Live Sync**: Turn a physical knob on the amp, and watch the app update instantly.
-- **Auto Backups**: Every time you plug in, Surveyor secretly backs up all your Amp and CabRig slots into standard JSON files.
+## The Reverse Engineering Journey
 
-## How to build
-Open the project in Android Studio, hit `Run`, and grab a USB-C to USB-C cable. 
-Give Android permission to access the USB device when prompted.
+The AMPED 3 uses a proprietary, chunked USB HID protocol (`0x1036`) that differs completely from older ID:CORE amps. Through extensive packet sniffing, we uncovered exactly how the pedal communicates.
+
+For example, we discovered that while basic EQ parameters can be updated live with 1-byte payloads, complex CabRig selections require the software to compile an entire DSP IR chunk and upload it in bulk! 
+
+For full technical details, hex maps, and offset ranges (like the critical discovery that Room Level clips at `0x7f`), check out our [Protocol Documentation](docs/PROTOCOL.md).
+
+## Installation and Build
+
+This is a native Android application built with Kotlin and Jetpack Compose.
+
+1. Clone the repository.
+2. Open the project in Android Studio.
+3. Build and deploy to your Android device (`./gradlew assembleDebug`).
+4. Connect your AMPED 3 via a USB-C OTG cable.
+5. Grant USB permissions when prompted by Android.
 
 ## Disclaimer
-This project is not affiliated with, endorsed by, or in any way officially connected to Blackstar Amplification. We just really wanted to use our pedals with our phones.
 
-*Built with ❤️ (and a lot of hex dumps).*
+*Surveyor is an independent, community-driven project and is in no way affiliated with, endorsed by, or supported by Blackstar Amplification. Use at your own risk.*
