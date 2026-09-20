@@ -72,7 +72,7 @@ class AmpedMidiController(private val context: Context) {
     fun connectToAmp() {
         if (running.get()) { refresh(); return }
         val d = manager.deviceList.values.firstOrNull { it.vendorId == AmpedProtocol.VID && it.productId == AmpedProtocol.PID }
-        if (d == null) { mutable.update { it.copy(status = T("AMPED 3 non collegata · usa un cavo USB dati / OTG", "AMPED 3 not connected · use a USB data / OTG cable")) }; return }
+        if (d == null) { mutable.update { it.copy(status = T("AMPED 3 non collegata · serve un cavo dati OTG", "AMPED 3 not connected · needs a USB data cable")) }; return }
         deviceId = d.deviceId
         if (manager.hasPermission(d)) open(d) else {
             mutable.update { it.copy(status = T("Autorizza l’accesso USB ad AMPED 3", "Allow USB access to AMPED 3")) }
@@ -341,6 +341,21 @@ class AmpedMidiController(private val context: Context) {
             if (coeff != null) transfer(coeff) else { mutable.update { it.copy(busy=false) }; startSync() }
         }
     }
+    /** Stato dimostrativo per ispezionare l'interfaccia senza pedaliera, ad esempio su emulatore.
+     *  Non e' inventato: sono i byte letti dall'AMPED 3 il 21 settembre 2026, cassa 4x12 Classic UK
+     *  con microfono a nastro 160 fuori asse. Si attiva solo in build di debug. */
+    fun enableDemo() {
+        val amp = listOf(104, 60, 58, 43, 81, 51, 76, 55, 65, 110, 102, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 2, 0, 1, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 13, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+        val cab = listOf(20, 5, 1, 77, 31, 0, 0, 45, 127, 0, 1, 98, 0, 127, 156, 0, 0, 143, 0, 0, 24, 176, 30, 0, 0, 133, 1, 134, 17, 0, 0, 88, 93, 0, 0, 78, 127, 0, 1, 113, 0, 127, 122, 0, 127, 161, 0, 0, 0, 161, 127, 0, 0, 140, 1, 109, 1, 71, 0, 0, 1, 0, 0, 0, 0, 105, 1, 96, 0, 0, 89, 0, 0, 123, 0, 0, 0, 155, 0, 0, 0, 157, 1, 95)
+        mutable.update {
+            AmpState(connected = true, synced = true, status = "DEMO · 4x12 Classic UK",
+                amp = amp, cab = cab, ampSlot = 1, cabSlot = 3,
+                ampNames = mapOf(1 to "Clean", 2 to "New American Jesus", 3 to "New American Jesus"),
+                cabNames = mapOf(1 to "Balanced 4x12", 2 to "Modern USA", 3 to "USA Combo"),
+                logs = it.logs)
+        }
+    }
+
     fun exportData(): String = JSONObject().put("format","amped-usb-library-v1")
         .put("presets", JSONArray(presetsMutable.value.map { it.json() }))
         .put("hardwareBackups",JSONArray(context.filesDir.listFiles()?.filter { it.name.startsWith("backup-") }?.map { JSONObject(it.readText()) } ?: emptyList<JSONObject>()))

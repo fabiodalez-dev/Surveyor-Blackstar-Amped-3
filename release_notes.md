@@ -1,24 +1,35 @@
-### Surveyor v1.3.0 — Cabinet Level, and levels in real decibels
+### Surveyor v1.4.0 — built to be read on stage
 
-#### Cabinet Level is now in the app
+A phone sitting by your feet in a dim room is read in a glance, or it is useless. This release is mostly about that, plus two corrections that came out of testing it.
 
-Architect has always had it; Surveyor did not. Offset 3 was mapped and verified during the previous release but left out of the UI because there was no hardware on hand to test it. It is in now, next to the cabinet controls, and it was tested on a physical AMPED 3: the app's own packet written to the pedal, read back, and the whole CabRig block compared byte for byte afterwards.
+#### The controls
 
-#### Cabinet and Room levels read in decibels
+Values are now set in large tabular figures, so they do not shift around while you drag and they stay readable at arm's length. The faders have a taller track and a fader cap instead of a dot.
 
-Both controls used to show a raw 0-255 number. They now show decibels, from a scale calibrated against the hardware rather than guessed: stepping the Architect sliders one notch at a time and pairing each readout with the byte sent gives `dB = raw x 24 / 127 - 12`, which reproduces all fifteen measured readouts exactly. The byte range spans -12 to +12 dB.
+**They only respond to a drag.** A Material slider jumps to wherever you tap it, which on a phone lying next to a pedalboard means a brush against the screen can throw your gain to maximum. Dragging is deliberate; tapping now does nothing.
 
-The Master level is deliberately left as a raw value. Its taper is non-linear and heads to -INF — stepping down from 105 gives 0.0, -0.2, -0.5, -0.8, -1.0, -1.4 dB — and a number that looks precise but is invented is worse than an honest raw one.
+The gain fader runs from yellow to red as it climbs, the way a valve looks when it is being worked, and the glow grows with it.
 
-#### Local presets restore what the UI exposes
+#### The cabinet drawing was always a 4x12
 
-Loading a saved preset used to restore only the four EQ bands on the CabRig side, so cabinet level, room level and the two cut filters silently stayed where they were. All of those are restored now. Every offset involved was write-tested on the hardware.
+It drew whatever cabinet was loaded, not the one you were browsing, so picking a 2x12 in the list left a 4x12 on screen. It now follows the selection, reads the cone count and size from the cabinet name, marks a combo, and says NOT LOADED while your choice differs from what the pedal is running. A 10 inch cone is drawn smaller than a 12.
 
-Master level stays out on purpose, for the same reason the amplifier's Master does: loading a preset should not change how loud the rig is.
+#### Power is in the app
 
-#### Also
+The 100 W / 20 W / 1 W selector was missing. Its values were read off Architect's own control one step at a time: 1 is 100 W, 3 is 20 W, 2 is 1 W.
 
-- 20 unit tests, all passing. The level conversion is pinned to the measured readouts, so changing it has to answer to the hardware.
-- `docs/PROTOCOL_VERIFICATION.md` carries the calibration table and the write test.
+#### Italian text in the English app
 
-**Download `Surveyor-v1.3.0.apk` below.** Android 8.0 or newer, USB-OTG cable required.
+The status line, errors, save destinations and several labels were hardcoded in Italian and showed up that way with the app set to English. They are translated.
+
+#### Elsewhere
+
+- The launch screen is charcoal instead of white, and the Surveyor mark fades in over a warming filament rather than appearing cold.
+- Navigation icons are drawn in the same vocabulary as the controls: a knob, a cabinet, a stack, faders.
+- The three channel buttons sit in one row, with the active one warmed and lit.
+- Section headings match the parameter labels instead of using a different style.
+- README screenshots are current and in English.
+
+20 unit tests, all passing.
+
+**Download `Surveyor-v1.4.0.apk` below.** Android 8.0 or newer, USB-OTG cable required.
