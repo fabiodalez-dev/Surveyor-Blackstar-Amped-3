@@ -108,7 +108,7 @@ fun T(it: String, en: String) = if (lang == "it") it else en
                 }
             }
             Row(Modifier.fillMaxWidth().background(Panel).padding(horizontal=16.dp,vertical=4.dp),verticalAlignment=Alignment.CenterVertically){
-                Text(s.status,Modifier.weight(1f),fontSize=12.sp,color=Muted)
+                Text(s.status.ifEmpty { T("Collega AMPED 3 via USB", "Connect AMPED 3 over USB") },Modifier.weight(1f),fontSize=12.sp,color=Muted)
                 TextButton(onClick={c.connectToAmp()},enabled=!s.busy){Text(if(s.connected)T("Sincronizza", "Sync") else T("Connetti", "Connect"))}
             }
             if(notice.isNotBlank())Text(notice,color=Red,fontSize=12.sp,modifier=Modifier.padding(16.dp))
@@ -174,13 +174,13 @@ fun T(it: String, en: String) = if (lang == "it") it else en
     Choices(T("Voce Overdrive", "Overdrive Voice"),s.amp[28],listOf("OD1" to 1,"OD2" to 0),s.synced&&!s.busy){c.setParameter(false,28,it)}
     Section(T("Boost e riverbero", "Boost and Reverb"))
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Checkbox(checked = (s.amp.getOrNull(32) ?: 0) and 64 != 0, onCheckedChange = { c.setParameter(false, 32, (s.amp.getOrNull(32) ?: 0) xor 64) }, enabled = s.synced && !s.busy)
+        Checkbox(checked = (s.amp.getOrNull(AmpedProtocol.AMP_STATUS) ?: 0) and AmpedProtocol.AMP_BOOST_BIT != 0, onCheckedChange = { c.setParameter(false, AmpedProtocol.AMP_STATUS, (s.amp.getOrNull(AmpedProtocol.AMP_STATUS) ?: 0) xor AmpedProtocol.AMP_BOOST_BIT) }, enabled = s.synced && !s.busy)
         Text(T("Attiva Boost", "Enable Boost"), modifier = Modifier.padding(start = 4.dp))
     }
     Box(Modifier.fillMaxWidth(), contentAlignment=Alignment.Center) { Parameter("Boost",s.amp[2],127,s.synced&&!s.busy){c.setParameter(false,2,it)} }
     Choices(T("Posizione boost", "Boost Position"),s.amp[24],listOf("Pre" to 1,"Post" to 0),s.synced&&!s.busy){c.setParameter(false,24,it)}
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Checkbox(checked = s.amp.getOrNull(33) == 1, onCheckedChange = { c.setParameter(false, 33, if (it) 1 else 0) }, enabled = s.synced && !s.busy)
+        Checkbox(checked = s.amp.getOrNull(AmpedProtocol.AMP_REVERB_ON) == 1, onCheckedChange = { c.setParameter(false, AmpedProtocol.AMP_REVERB_ON, if (it) 1 else 0) }, enabled = s.synced && !s.busy)
         Text(T("Attiva Riverbero", "Enable Reverb"), modifier = Modifier.padding(start = 4.dp))
     }
     Box(Modifier.fillMaxWidth(), contentAlignment=Alignment.Center) { Parameter(T("Riverbero", "Reverb"),s.amp[3],127,s.synced&&!s.busy){c.setParameter(false,3,it)} }
@@ -278,20 +278,20 @@ fun T(it: String, en: String) = if (lang == "it") it else en
     }
     Choices("Tipo di Stanza", s.cab.getOrNull(56) ?: 0, listOf("Small" to 0, "Small Damped" to 1, "Medium" to 2, "Medium Damped" to 3, "Large" to 4, "Large Damped" to 5), s.synced && !s.busy) { c.setParameter(true, 56, it) }
     Choices(T("Ampiezza Stereo", "Stereo Width"), s.cab.getOrNull(60) ?: 0, listOf("Mono" to 0, "Stereo" to 1, "Wide" to 2), s.synced && !s.busy) { c.setParameter(true, 60, it) }
-    Box(Modifier.fillMaxWidth(), contentAlignment=Alignment.Center) { Parameter("Livello Room", s.cab.getOrNull(57) ?: 0, 127, s.synced && !s.busy) { c.setParameter(true, 57, it) } }
+    Box(Modifier.fillMaxWidth(), contentAlignment=Alignment.Center) { Parameter(T("Livello Room", "Room Level"), s.cab.getOrNull(AmpedProtocol.CAB_ROOM_LEVEL) ?: 0, 127, s.synced && !s.busy) { c.setParameter(true, AmpedProtocol.CAB_ROOM_LEVEL, it) } }
     
     Section("Filtri (Cut)")
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Checkbox(checked = s.cab.getOrNull(66) == 1, onCheckedChange = { c.setParameter(true, 66, if (it) 1 else 0) }, enabled = s.synced && !s.busy)
+        Checkbox(checked = s.cab.getOrNull(AmpedProtocol.CAB_LOW_CUT_ON) == 1, onCheckedChange = { c.setParameter(true, AmpedProtocol.CAB_LOW_CUT_ON, if (it) 1 else 0) }, enabled = s.synced && !s.busy)
         Text("Low-Cut", modifier = Modifier.padding(start = 8.dp, end = 24.dp))
-        Checkbox(checked = s.cab.getOrNull(82) == 1, onCheckedChange = { c.setParameter(true, 82, if (it) 1 else 0) }, enabled = s.synced && !s.busy)
+        Checkbox(checked = s.cab.getOrNull(AmpedProtocol.CAB_HIGH_CUT_ON) == 1, onCheckedChange = { c.setParameter(true, AmpedProtocol.CAB_HIGH_CUT_ON, if (it) 1 else 0) }, enabled = s.synced && !s.busy)
         Text("High-Cut", modifier = Modifier.padding(start = 8.dp))
     }
-    if (s.cab.getOrNull(66) == 1) Box(Modifier.fillMaxWidth(), contentAlignment=Alignment.Center) { Parameter("Frequenza Low-Cut", s.cab.getOrNull(83) ?: 0, 255, s.synced && !s.busy, format = { "%.0f Hz".format(java.util.Locale.US, 20.0 * Math.pow(400.0/20.0, it / 255.0)) }) { c.setParameter(true, 83, it) } }
-    if (s.cab.getOrNull(82) == 1) Box(Modifier.fillMaxWidth(), contentAlignment=Alignment.Center) { Parameter("Frequenza High-Cut", s.cab.getOrNull(67) ?: 0, 255, s.synced && !s.busy, format = { "%.0f Hz".format(java.util.Locale.US, 2000.0 * Math.pow(20000.0/2000.0, it / 255.0)) }) { c.setParameter(true, 67, it) } }
+    if (s.cab.getOrNull(AmpedProtocol.CAB_LOW_CUT_ON) == 1) Box(Modifier.fillMaxWidth(), contentAlignment=Alignment.Center) { Parameter(T("Frequenza Low-Cut", "Low-Cut Frequency"), s.cab.getOrNull(AmpedProtocol.CAB_LOW_CUT_FREQ) ?: 0, 255, s.synced && !s.busy, format = { "~%.0f Hz".format(java.util.Locale.US, 20.0 * Math.pow(400.0/20.0, it / 255.0)) }) { c.setParameter(true, AmpedProtocol.CAB_LOW_CUT_FREQ, it) } }
+    if (s.cab.getOrNull(AmpedProtocol.CAB_HIGH_CUT_ON) == 1) Box(Modifier.fillMaxWidth(), contentAlignment=Alignment.Center) { Parameter(T("Frequenza High-Cut", "High-Cut Frequency"), s.cab.getOrNull(AmpedProtocol.CAB_HIGH_CUT_FREQ) ?: 0, 255, s.synced && !s.busy, format = { "~%.0f Hz".format(java.util.Locale.US, 2000.0 * Math.pow(20000.0/2000.0, it / 255.0)) }) { c.setParameter(true, AmpedProtocol.CAB_HIGH_CUT_FREQ, it) } }
 
     Section("Master CabRig")
-    Box(Modifier.fillMaxWidth(), contentAlignment=Alignment.Center) { Parameter("Volume Globale", s.cab.getOrNull(65) ?: 0, 255, s.synced && !s.busy) { c.setParameter(true, 65, it) } }
+    Box(Modifier.fillMaxWidth(), contentAlignment=Alignment.Center) { Parameter(T("Volume Globale", "Master Level"), s.cab.getOrNull(AmpedProtocol.CAB_MASTER_LEVEL) ?: 0, 255, s.synced && !s.busy) { c.setParameter(true, AmpedProtocol.CAB_MASTER_LEVEL, it) } }
 
     Section(T("Salvataggio Rapido", "Quick Save"))
     var saveName by remember {mutableStateOf(s.cabNames[if (s.cabSlot > 0) s.cabSlot else 1] ?: "Mio CabRig")}

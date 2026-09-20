@@ -1,27 +1,31 @@
-Surveyor: Open-Source Android Controller for Blackstar AMPED (Reverse Engineered!)
+Surveyor: Android USB controller for the Blackstar AMPED 3, and a decoder for the CabRig DSP format
 
-Hello fellow developers and guitarists!
+Repo: https://github.com/fabiodalez-dev/Surveyor-Blackstar-Amped-3
 
-I want to share Surveyor, an open-source, mobile-first alternative to the official Blackstar "Architect" desktop software. I built this specifically for the Blackstar AMPED 3 (though it should be adaptable to the AMPED 1 and 2), because I was frustrated with needing a laptop just to tweak the CabRig settings or adjust the deep EQ at a gig.
+I reverse-engineered the USB HID protocol of the Blackstar AMPED 3 and wrote an Android controller for it, so that changing a cabinet or a deep EQ band no longer requires carrying a laptop to a gig. That part works and is the boring part. The interesting part is what I found inside the CabRig bulk transfer, because it turns a closed cabinet simulator into something you can write your own profiles for.
 
-Repo & APK Download: https://github.com/fabiodalez-dev/Surveyor-Blackstar-Amped-3
+What CabRig actually is
 
---- What is Surveyor? ---
-It’s an Android app built with Kotlin and Jetpack Compose. You connect your phone to the pedal via USB-OTG, and it gives you full control.
-- Native MIDI Control: Standard amp parameters (Gain, EQ, Master) actually use standard MIDI CC under the hood! The app leverages android.media.midi to achieve zero-latency bidirectional sync with the physical knobs.
-- CabRig Matrix: Access all 288 factory combinations (24 cabinets x 6 microphones x Axis).
+CabRig does not use convolution. There are no PCM samples, no WAV, no long FIR anywhere in the transfer. Architect computes a 260-byte coefficient profile per cabinet/microphone/axis choice and pushes it to the pedal as one 0xAA header followed by five 0xAC reports; every report is 64 bytes and carries a big-endian CRC-16/XMODEM of its own payload, while the header carries the CRC of the reassembled 260 bytes in little-endian order plus the length and the chunk count. The payload is 65 little-endian float32 values: one direct coefficient and sixteen compact second-order recursive sections, four floats each. All 288 factory profiles I captured (24 cabinets x 6 microphones x 2 axes, 276 distinct payloads since a few choices intentionally share data) pass both checksum levels and are checked into the repo as extracted data, not as anything I invented. The Architect binary agrees with the structure: it contains DSP_BLOCK_BiquadFilter_init, DSP_Block_BiquadFilter.c and CabRigCoeffsBase, and the disassembled coefficient routine caps out at sixteen sections with four input floats each.
 
---- The Reverse Engineering Breakthrough: CabRig DSP ---
-The most exciting part of this project was reverse-engineering the proprietary USB HID protocol used for the CabRig simulations.
+That explains the latency budget of the pedal. Sixteen biquads in cascade reproduce the magnitude response and the resonances of a cabinet for a fraction of the cost of a convolution, and they give up the long room tail in exchange. It also means the entire cabinet character of the unit is 260 bytes of open, checksummable data.
 
-Through USB packet sniffing and analyzing the JUCE-based Architect binary, we cracked the format:
-- No Convolutions: Blackstar does NOT use traditional WAV Impulse Responses (IRs).
-- The Format: The DSP payload is an ultra-optimized 260-byte binary chunk. It consists of 65 little-endian float32 values (1 direct coefficient + 16 compact IIR biquad sections).
-- Integrity Checks: The bulk transfer (0xAA header + five 0xAC chunks) is protected by a big-endian CRC-16/XMODEM.
+Why this opens the door to custom IRs
 
---- The Future: Custom IR Support! ---
-Because the 65-float format has been completely decoded, we can technically load custom IRs into the Amped pedal.
-Our offline Python tool (tools/cabrig_dsp.py) features an experimental --fit-ir mode. It uses System Identification curve-fitting to take a standard WAV IR and calculate the 65 float32 coefficients that generate an identical EQ curve. To guarantee that the recursive filters remain stable (and don't blow up the amp's speakers), the algorithm fits the numerators against an already-stable pole bank from an official profile.
+Once the container is understood, writing a valid profile is only a matter of choosing 65 floats that are stable. tools/cabrig_dsp.py does that offline, never touching the USB device: it decodes and validates a captured profile, computes the poles of each section, verifies that every pole still sits inside the unit circle after float32 quantisation, and rebuilds both checksum layers. The --attenuate-db path is the safe proof that a structurally valid non-factory packet can be produced at all.
 
-If you are a DSP nerd or a guitarist looking to hack your Blackstar pedal, come check out the repo, read the technical documentation, and feel free to contribute! 
-We gladly accept Issues and Pull Requests on GitHub to fix bugs, test the Amped 1/2 compatibility, or improve the IR conversion algorithm! 🛠️
+The experimental part is --fit-ir. It takes a mono WAV impulse response, transforms it, and solves for the 33 real numerator weights (one direct term plus two per section) by complex least squares over the fixed, known-stable pole bank of an existing factory profile. Keeping the denominators frozen is the whole trick: the fit cannot produce an unstable filter, because it never touches what determines stability. The tool then re-derives the poles from the quantised result, refuses to emit anything that drifted out of the unit circle, reports the relative complex fit error and the predicted peak gain in dB, and stamps hardware_audio_validation: false on its own output.
+
+python3 tools/cabrig_dsp.py app/src/main/assets/cab_profiles.json --key 21:5:0 --fit-ir mycab.wav --output /tmp/custom-cab.json
+
+What is verified and what is not
+
+Verified: the container format, both checksum layers, all 288 profiles, an independent Python transfer of a foreign profile into the live DSP with byte-for-byte readback, and a full restore of the original live state. The six factory slots were read before and after and are unchanged. The slot save path on Android does a pre-save read, a local fsync, an acknowledgement wait, a reread and a name/data comparison before it reports success.
+
+Not verified: the audio side of the model. The 48 kHz sample rate is an assumption the tool labels as such, not a rate I read off the hardware. Section ordering, the exact summation topology and gain normalisation are inferred from the disassembly and the payload layout, not confirmed by a measured sweep. A fitted profile is therefore an approximation whose sound I have not yet characterised, and a pole bank borrowed from another cabinet cannot represent an arbitrary long-delay IR no matter how well the numerators are solved. Anyone loading a fitted profile should back up all six slots, load into the live DSP only, and restore without saving.
+
+Where help is genuinely useful
+
+A logarithmic sweep through the USB output, compared against the model prediction, would settle the topology question in an afternoon and is the single most valuable contribution right now. The fit itself deserves better numerics: it currently minimises unweighted complex error on a linear frequency grid, which spends most of its resolution on the top octave and treats phase as if it mattered as much as magnitude, so a log-spaced magnitude-weighted fit should sound noticeably closer for the same 33 degrees of freedom. And I only own an AMPED 3, so compatibility with the AMPED 1 and 2 is unknown rather than likely: the app filters on VID 27d4 / PID 0072 and I would rather someone verified the descriptors than assumed.
+
+Issues and pull requests are welcome, including the ones that tell me the model is wrong.
