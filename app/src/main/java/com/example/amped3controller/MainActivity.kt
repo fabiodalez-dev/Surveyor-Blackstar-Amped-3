@@ -22,6 +22,11 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.clickable
+
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -52,7 +57,7 @@ class MainActivity : ComponentActivity() {
         controller=AmpedMidiController(applicationContext)
         setContent {
             MaterialTheme(colorScheme=darkColorScheme(primary=Red,onPrimary=Coal,background=Coal,surface=Coal,surfaceVariant=Panel,onSurface=Paper,onSurfaceVariant=Muted,secondary=Red)) {
-                AmpedApp(controller,notice,{export.launch("Amped3-preset-e-backup.json")},{import.launch(arrayOf("application/json","text/plain"))})
+                AmpedApp(controller,notice,{export.launch("Amped3-preset-e-backup.json")},{import.launch(arrayOf("application/json","text/plain","text/xml","application/xml","*/*"))})
             }
         }
         controller.connectToAmp()
@@ -67,7 +72,7 @@ fun T(it: String, en: String) = if (lang == "it") it else en
     val s by c.state.collectAsState()
     val presets by c.presets.collectAsState()
     var tab by remember {mutableIntStateOf(0)}
-    val titles=listOf(T("Amp","Amp"),T("CabRig","CabRig"),T("Preset","Preset"),T("USB","USB"))
+    val titles=listOf(T("Amp","Amp"),T("CabRig","CabRig"),T("Preset","Preset"),T("Impostazioni","Settings"))
     Scaffold(
         containerColor = Coal,
         bottomBar = {
@@ -102,6 +107,12 @@ fun T(it: String, en: String) = if (lang == "it") it else en
                     1->CabPage(s,c)
                     2->PresetsPage(s,c,presets,onExport,onImport)
                     3->{
+                        Heading(T("Impostazioni", "Settings"),T("Sistema e diagnostica", "System and Diagnostics"))
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 16.dp)) {
+                            Text(T("Lingua dell'app:", "App Language:"), color=Color.White, modifier=Modifier.weight(1f))
+                            SegmentedButton(listOf("Italiano" to "it", "English" to "en"), lang) { lang = it }
+                        }
+                        HorizontalDivider(Modifier.padding(bottom=12.dp),color=Panel)
                         Heading(T("Connessione", "Connection"),"USB HID · AMPED 3")
                         Text(T("Collega il telefono direttamente alla pedaliera con un cavo USB dati. Consenti l’accesso USB quando richiesto. I valori compaiono dopo la lettura della pedaliera.", "Connect your phone directly to the pedal using a USB data cable. Allow USB access when prompted. Values will appear after the pedal is read."),color=Muted)
                         Text(T("Backup automatico", "Auto Backup"),fontWeight=FontWeight.Bold,modifier=Modifier.padding(top=16.dp))
@@ -120,13 +131,24 @@ fun T(it: String, en: String) = if (lang == "it") it else en
 @Composable private fun Section(title:String){HorizontalDivider(Modifier.padding(top=18.dp,bottom=12.dp),color=Panel);Text(title,fontSize=17.sp,fontWeight=FontWeight.SemiBold)}
 @Composable private fun AmpPage(s:AmpState,c:AmpedMidiController){
     Heading(s.ampNames[s.ampSlot] ?: T("Il tuo amplificatore", "Your Amplifier"),if(s.ampSlot>0)"Slot ${s.ampSlot} · impostazioni attuali" else T("Impostazioni attuali", "Current Settings"))
-    Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
-        listOf("Clean","Crunch","Overdrive").forEachIndexed {i,t->FilterChip(selected=s.ampSlot==i+1,onClick={c.recallAmp(i+1)},label={Text(t)},enabled=s.synced&&!s.busy)}
+    Column(verticalArrangement=Arrangement.spacedBy(8.dp), modifier=Modifier.fillMaxWidth()){
+        listOf("Clean","Crunch","Overdrive").chunked(2).forEachIndexed { rowIndex, row ->
+            Row(horizontalArrangement=Arrangement.spacedBy(8.dp), modifier=Modifier.fillMaxWidth()) {
+                row.forEachIndexed { colIndex, name ->
+                    val i = rowIndex * 2 + colIndex
+                    val sel = s.ampSlot == i+1
+                    Box(modifier = Modifier.weight(1f).aspectRatio(2.2f).background(if(sel) Red else Panel, RoundedCornerShape(8.dp)).clickable(enabled=s.synced&&!s.busy){c.recallAmp(i+1)}, contentAlignment=Alignment.Center) {
+                        Text(name.uppercase(), color=if(sel) Color.White else Muted, fontWeight=FontWeight.Black, fontSize=16.sp)
+                    }
+                }
+                if(row.size == 1) Spacer(Modifier.weight(1f))
+            }
+        }
     }
     if(!s.synced)Text(T("In attesa dei valori reali della pedaliera.", "Waiting for live values from the pedal."),color=Muted,fontSize=13.sp)
-    listOf("Gain" to 0,"Volume preamp" to 1).forEach {(label,index)->Parameter(label,s.amp[index],127,s.synced&&!s.busy,{"%.1f".format(Locale.US,it*10f/127)}){c.setParameter(false,index,it)}}
+    FlowRow(Modifier.fillMaxWidth(), horizontalArrangement=Arrangement.SpaceEvenly) { listOf("Gain" to 0,"Volume preamp" to 1).forEach {(label,index)->Parameter(label,s.amp[index],127,s.synced&&!s.busy,{"%.1f".format(Locale.US,it*10f/127)}){c.setParameter(false,index,it)}} }
     Section(T("Equalizzazione", "Equalization"))
-    listOf("Bass" to 4,"Middle" to 5,"Treble" to 6,"ISF" to 7,"Presence" to 8).forEach {(label,index)->Parameter(label,s.amp[index],127,s.synced&&!s.busy,{"%.1f".format(Locale.US,it*10f/127)}){c.setParameter(false,index,it)}}
+    FlowRow(Modifier.fillMaxWidth(), horizontalArrangement=Arrangement.SpaceEvenly) { listOf("Bass" to 4,"Middle" to 5,"Treble" to 6,"ISF" to 7,"Presence" to 8).forEach {(label,index)->Parameter(label,s.amp[index],127,s.synced&&!s.busy,{"%.1f".format(Locale.US,it*10f/127)}){c.setParameter(false,index,it)}} }
     Section(T("Carattere", "Character"))
     Choices(T("Risposta", "Response"),s.amp[22],listOf("EL84" to 2,"EL34" to 3,"6L6" to 1),s.synced&&!s.busy){c.setParameter(false,22,it)}
     Choices(T("Voce Clean", "Clean Voice"),s.amp[26],listOf("Warm" to 1,"Bright" to 0),s.synced&&!s.busy){c.setParameter(false,26,it)}
@@ -137,16 +159,16 @@ fun T(it: String, en: String) = if (lang == "it") it else en
         Checkbox(checked = (s.amp.getOrNull(32) ?: 0) and 64 != 0, onCheckedChange = { c.setParameter(false, 32, (s.amp.getOrNull(32) ?: 0) xor 64) }, enabled = s.synced && !s.busy)
         Text(T("Attiva Boost", "Enable Boost"), modifier = Modifier.padding(start = 4.dp))
     }
-    Parameter("Boost",s.amp[2],127,s.synced&&!s.busy){c.setParameter(false,2,it)}
+    Box(Modifier.fillMaxWidth(), contentAlignment=Alignment.Center) { Parameter("Boost",s.amp[2],127,s.synced&&!s.busy){c.setParameter(false,2,it)} }
     Choices(T("Posizione boost", "Boost Position"),s.amp[24],listOf("Pre" to 1,"Post" to 0),s.synced&&!s.busy){c.setParameter(false,24,it)}
     Row(verticalAlignment = Alignment.CenterVertically) {
         Checkbox(checked = s.amp.getOrNull(33) == 1, onCheckedChange = { c.setParameter(false, 33, if (it) 1 else 0) }, enabled = s.synced && !s.busy)
         Text(T("Attiva Riverbero", "Enable Reverb"), modifier = Modifier.padding(start = 4.dp))
     }
-    Parameter(T("Riverbero", "Reverb"),s.amp[3],127,s.synced&&!s.busy){c.setParameter(false,3,it)}
+    Box(Modifier.fillMaxWidth(), contentAlignment=Alignment.Center) { Parameter(T("Riverbero", "Reverb"),s.amp[3],127,s.synced&&!s.busy){c.setParameter(false,3,it)} }
     Choices(T("Carattere riverbero", "Reverb Character"),s.amp[25],listOf("Dark" to 1,"Light" to 0),s.synced&&!s.busy){c.setParameter(false,25,it)}
     Section(T("Uscita", "Output"))
-    Parameter("Master",s.amp[9],127,s.synced&&!s.busy){c.setParameter(false,9,it)}
+    Box(Modifier.fillMaxWidth(), contentAlignment=Alignment.Center) { Parameter("Master",s.amp[9],127,s.synced&&!s.busy){c.setParameter(false,9,it)} }
     Section(T("Salvataggio Rapido", "Quick Save"))
     var saveName by remember {mutableStateOf(s.ampNames[s.ampSlot] ?: "Mio Suono")}
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -157,6 +179,19 @@ fun T(it: String, en: String) = if (lang == "it") it else en
 @Composable private fun CabPage(s:AmpState,c:AmpedMidiController){
     val name=AmpedProtocol.cabinetNames.getOrNull(s.cab[0])?:"CabRig"
     Heading(name,if(s.cabSlot>0)"CabRig · slot ${s.cabSlot}" else "CabRig")
+    Column(verticalArrangement=Arrangement.spacedBy(8.dp), modifier=Modifier.fillMaxWidth().padding(bottom=12.dp)){
+        listOf("Cab 1","Cab 2","Cab 3").chunked(3).forEachIndexed { rowIndex, row ->
+            Row(horizontalArrangement=Arrangement.spacedBy(8.dp), modifier=Modifier.fillMaxWidth()) {
+                row.forEachIndexed { colIndex, t ->
+                    val i = rowIndex * 3 + colIndex
+                    val sel = s.cabSlot == i+1
+                    Box(modifier = Modifier.weight(1f).aspectRatio(2.5f).background(if(sel) Red else Panel, RoundedCornerShape(8.dp)).clickable(enabled=s.synced&&!s.busy){c.recallCab(i+1)}, contentAlignment=Alignment.Center) {
+                        Text(t.uppercase(), color=if(sel) Color.White else Muted, fontWeight=FontWeight.Black, fontSize=16.sp)
+                    }
+                }
+            }
+        }
+    }
     CabinetDrawing(name)
     var choosing by remember {mutableStateOf(false)}
     var mic by remember(s.cab[1]){mutableIntStateOf(if(s.cab[1] in 0..5) s.cab[1] else 0)}
@@ -194,9 +229,9 @@ fun T(it: String, en: String) = if (lang == "it") it else en
         Checkbox(checked = s.cab.getOrNull(74) == 1, onCheckedChange = { c.setParameter(true, 74, if (it) 1 else 0) }, enabled = s.synced && !s.busy)
         Text(T("Bypass EQ", "Bypass EQ"), modifier = Modifier.padding(start = 4.dp))
     }
-    listOf("Low" to 70,"Low mids" to 73,"High mids" to 77,"High" to 81).forEach {(label,index)->
+    FlowRow(Modifier.fillMaxWidth(), horizontalArrangement=Arrangement.SpaceEvenly) { listOf("Low" to 70,"Low mids" to 73,"High mids" to 77,"High" to 81).forEach {(label,index)->
         if (s.cab.getOrNull(74) != 1) Parameter(label,s.cab[index],255,s.synced&&!s.busy,{"%+.1f dB".format(Locale.US,(it-128)*10f/127)}){c.setParameter(true,index,it)}
-    }
+    } }
     Section(T("Stanza (Room)", "Room"))
     Row(verticalAlignment = Alignment.CenterVertically) {
         Checkbox(checked = s.cab.getOrNull(58) == 1, onCheckedChange = { c.setParameter(true, 58, if (it) 1 else 0) }, enabled = s.synced && !s.busy)
@@ -206,7 +241,7 @@ fun T(it: String, en: String) = if (lang == "it") it else en
     }
     Choices("Tipo di Stanza", s.cab.getOrNull(56) ?: 0, listOf("Small" to 0, "Small Damped" to 1, "Medium" to 2, "Medium Damped" to 3, "Large" to 4, "Large Damped" to 5), s.synced && !s.busy) { c.setParameter(true, 56, it) }
     Choices(T("Ampiezza Stereo", "Stereo Width"), s.cab.getOrNull(60) ?: 0, listOf("Mono" to 0, "Stereo" to 1, "Wide" to 2), s.synced && !s.busy) { c.setParameter(true, 60, it) }
-    Parameter("Livello Room", s.cab.getOrNull(83) ?: 0, 255, s.synced && !s.busy) { c.setParameter(true, 83, it) }
+    Box(Modifier.fillMaxWidth(), contentAlignment=Alignment.Center) { Parameter("Livello Room", s.cab.getOrNull(83) ?: 0, 255, s.synced && !s.busy) { c.setParameter(true, 83, it) } }
     
     Section("Filtri (Cut)")
     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -215,11 +250,11 @@ fun T(it: String, en: String) = if (lang == "it") it else en
         Checkbox(checked = s.cab.getOrNull(82) == 1, onCheckedChange = { c.setParameter(true, 82, if (it) 1 else 0) }, enabled = s.synced && !s.busy)
         Text("High-Cut", modifier = Modifier.padding(start = 8.dp))
     }
-    if (s.cab.getOrNull(66) == 1) Parameter("Frequenza Low-Cut", s.cab.getOrNull(57) ?: 0, 255, s.synced && !s.busy) { c.setParameter(true, 57, it) }
-    if (s.cab.getOrNull(82) == 1) Parameter("Frequenza High-Cut", s.cab.getOrNull(67) ?: 0, 255, s.synced && !s.busy) { c.setParameter(true, 67, it) }
+    if (s.cab.getOrNull(66) == 1) Box(Modifier.fillMaxWidth(), contentAlignment=Alignment.Center) { Parameter("Frequenza Low-Cut", s.cab.getOrNull(57) ?: 0, 255, s.synced && !s.busy) { c.setParameter(true, 57, it) } }
+    if (s.cab.getOrNull(82) == 1) Box(Modifier.fillMaxWidth(), contentAlignment=Alignment.Center) { Parameter("Frequenza High-Cut", s.cab.getOrNull(67) ?: 0, 255, s.synced && !s.busy) { c.setParameter(true, 67, it) } }
 
     Section("Master CabRig")
-    Parameter("Volume Globale", s.cab.getOrNull(65) ?: 0, 255, s.synced && !s.busy) { c.setParameter(true, 65, it) }
+    Box(Modifier.fillMaxWidth(), contentAlignment=Alignment.Center) { Parameter("Volume Globale", s.cab.getOrNull(65) ?: 0, 255, s.synced && !s.busy) { c.setParameter(true, 65, it) } }
 
     Section(T("Salvataggio Rapido", "Quick Save"))
     var saveName by remember {mutableStateOf(s.cabNames[if (s.cabSlot > 0) s.cabSlot else 1] ?: "Mio CabRig")}
@@ -263,15 +298,59 @@ fun T(it: String, en: String) = if (lang == "it") it else en
     Section("Backup e Ripristino")
     Row(horizontalArrangement=Arrangement.spacedBy(12.dp)){OutlinedButton(onClick=onExport,modifier=Modifier.weight(1f)){Text(T("Esporta", "Export"))};OutlinedButton(onClick=onImport,modifier=Modifier.weight(1f)){Text(T("Importa", "Import"))}}
 }
-@OptIn(ExperimentalLayoutApi::class)
 @Composable private fun Choices(label:String,value:Int,options:List<Pair<String,Int>>,enabled:Boolean,onSelect:(Int)->Unit){
-    Text(label,color=Muted,fontSize=12.sp)
-    FlowRow(horizontalArrangement=Arrangement.spacedBy(8.dp), verticalArrangement=Arrangement.spacedBy(8.dp)){options.forEach {(name,id)->FilterChip(selected=value==id,onClick={onSelect(id)},enabled=enabled,label={Text(name)})}}
+    Text(label.uppercase(),color=Muted,fontSize=12.sp,fontWeight=FontWeight.Bold,modifier=Modifier.padding(vertical=8.dp))
+    Column(verticalArrangement=Arrangement.spacedBy(8.dp), modifier=Modifier.fillMaxWidth()){
+        options.chunked(2).forEach { row ->
+            Row(horizontalArrangement=Arrangement.spacedBy(8.dp), modifier=Modifier.fillMaxWidth()) {
+                row.forEach { (name, id) ->
+                    val sel = value == id
+                    Box(modifier = Modifier.weight(1f).aspectRatio(2.2f).background(if(sel) Red else Panel, RoundedCornerShape(8.dp)).clickable(enabled=enabled){onSelect(id)}, contentAlignment=Alignment.Center) {
+                        Text(name.uppercase(), color=if(sel) Color.White else Muted, fontWeight=FontWeight.Bold, fontSize=13.sp, textAlign=androidx.compose.ui.text.style.TextAlign.Center)
+                    }
+                }
+                if(row.size == 1) Spacer(Modifier.weight(1f))
+            }
+        }
+    }
 }
-@Composable private fun Parameter(label:String,value:Int,max:Int,enabled:Boolean,format:(Int)->String={"%.1f".format(Locale.US,it*10f/127)},onSet:(Int)->Unit){
+@Composable private fun Parameter(label:String,value:Int,max:Int,enabled:Boolean,format:(Int)->String={"%.1f".format(java.util.Locale.US,it*10f/127)},onSet:(Int)->Unit){
     var dragged by remember(value){mutableFloatStateOf(value.coerceAtLeast(0).toFloat())}
-    Column(Modifier.padding(vertical=4.dp)){
-        Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){Text(label,fontWeight=FontWeight.Medium);Text(if(value<0)"—" else format(dragged.toInt()),color=if(enabled)Red else Muted,fontWeight=FontWeight.SemiBold)}
-        Slider(value=dragged,onValueChange={dragged=it},onValueChangeFinished={onSet(dragged.toInt())},enabled=enabled&&value>=0,valueRange=0f..max.toFloat(),modifier=Modifier.height(48.dp))
+    Column(horizontalAlignment=Alignment.CenterHorizontally, modifier=Modifier.fillMaxWidth().padding(vertical=12.dp, horizontal=4.dp)){
+        Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween, verticalAlignment=Alignment.Bottom){
+            Text(label.uppercase(), color=Color.White, fontSize=11.sp, fontWeight=FontWeight.Bold, letterSpacing=1.sp)
+            Text(if(value<0)"—" else format(dragged.toInt()), color=if(enabled)Red else Muted, fontSize=20.sp, fontWeight=FontWeight.Black)
+        }
+        Box(contentAlignment=Alignment.Center, modifier=Modifier.fillMaxWidth().padding(top=8.dp)) {
+            Canvas(modifier=Modifier.fillMaxWidth().height(24.dp).padding(horizontal=12.dp)) {
+                val steps = 10
+                val stepWidth = size.width / steps
+                for (i in 0..steps) {
+                    val x = i * stepWidth
+                    val h = if (i == 0 || i == steps || i == steps/2) 8.dp.toPx() else 4.dp.toPx()
+                    drawLine(Color(0xFF444444), Offset(x, size.height/2 - h), Offset(x, size.height/2 + h), 2.dp.toPx(), StrokeCap.Round)
+                }
+            }
+            Slider(
+                value=dragged,
+                onValueChange={dragged=it},
+                onValueChangeFinished={onSet(dragged.toInt())},
+                enabled=enabled&&value>=0,
+                valueRange=0f..max.toFloat(),
+                colors=SliderDefaults.colors(thumbColor=Red, activeTrackColor=Red, inactiveTrackColor=Color(0xFF333333)),
+                modifier=Modifier.fillMaxWidth()
+            )
+        }
+    }
+}
+
+@Composable private fun SegmentedButton(options: List<Pair<String,String>>, selected: String, onSelect: (String) -> Unit) {
+    Row(modifier=Modifier.background(Panel, RoundedCornerShape(8.dp)).padding(4.dp)) {
+        options.forEach { (label, value) ->
+            val sel = selected == value
+            Box(modifier=Modifier.background(if(sel) Red else Color.Transparent, RoundedCornerShape(6.dp)).clickable { onSelect(value) }.padding(horizontal=12.dp, vertical=6.dp)) {
+                Text(label, color=if(sel) Color.White else Muted, fontWeight=FontWeight.Bold, fontSize=13.sp)
+            }
+        }
     }
 }

@@ -190,6 +190,11 @@ class AmpedMidiController(private val context: Context) {
         if (!state.value.synced || state.value.busy) return
         commands.offer { write(AmpedProtocol.parameter(cab,offset,value)); startSync() }
     }
+        fun recallCab(slot: Int) {
+        if (!state.value.synced || state.value.busy) return
+        mutable.update { it.copy(busy = true, status = "Cambio CabRig…") }
+        commands.offer { write(AmpedProtocol.packet(2,1,slot,0)) }
+    }
     fun recallAmp(slot: Int) {
         if (!state.value.synced || state.value.busy) return
         mutable.update { it.copy(busy = true, status = "Cambio canale…") }
@@ -280,9 +285,64 @@ class AmpedMidiController(private val context: Context) {
         .put("presets", JSONArray(presetsMutable.value.map { it.json() }))
         .put("hardwareBackups",JSONArray(context.filesDir.listFiles()?.filter { it.name.startsWith("backup-") }?.map { JSONObject(it.readText()) } ?: emptyList<JSONObject>()))
         .toString(2)
-    fun importData(json: String): String = runCatching {
-        require(json.length <= 2_000_000) { "File troppo grande" }
-        val root=JSONObject(json); require(root.getString("format")=="amped-usb-library-v1") { "Formato non riconosciuto" }
+    fun importData(data: String): String = runCatching {
+        require(data.length <= 2_000_000) { "File troppo grande" }
+        if (data.trim().startsWith("<?xml")) {
+            val name = Regex("<Name>(.*?)</Name>").find(data)?.groupValues?.get(1) ?: "Preset Importato"
+            fun v(tag: String) = Regex("<"+tag+">([0-9-]+)</"+tag+">").find(data)?.groupValues?.get(1)?.toIntOrNull()
+            
+            val amp = state.value.amp.toMutableList()
+            val cab = state.value.cab.toMutableList()
+            
+            if ("<Amplifier>" in data) {
+                v("Gain")?.let { amp[0] = it }
+                v("Volume")?.let { amp[1] = it }
+                v("Boost")?.let { amp[2] = it }
+                v("Reverb")?.let { amp[3] = it }
+                v("Bass")?.let { amp[4] = it }
+                v("Middle")?.let { amp[5] = it }
+                v("Treble")?.let { amp[6] = it }
+                v("ISF")?.let { amp[7] = it }
+                v("Presence")?.let { amp[8] = it }
+                v("Master")?.let { amp[9] = it }
+                
+                v("Response")?.let { amp[22] = it }
+                v("PrePost")?.let { amp[24] = it }
+                v("DarkLight")?.let { amp[25] = it }
+                v("Boost")?.let { if (it > 0) { /* Actually, Boost toggle in XML is under <TogglesSwitches> */ } }
+                
+                // Voice is Clean=1, Crunch=0, OD1=1, OD2=0? Let's just set the main params for now.
+            }
+            if ("<Channels>" in data) {
+                v("Cab_One")?.let { cab[0] = it }
+                v("Mic_One")?.let { cab[1] = it }
+                v("Axis_One")?.let { cab[2] = it }
+                v("Level_One")?.let { cab[63] = it }
+                
+                v("Room_Type")?.let { cab[56] = it }
+                v("Room_Level")?.let { cab[83] = it }
+                v("Room_Solo")?.let { cab[58] = it }
+                v("Room_Mute")?.let { cab[59] = it }
+                v("Room_Width")?.let { cab[60] = it }
+                v("Level_Master")?.let { cab[65] = it }
+                
+                v("EQ_Master_Bypass")?.let { cab[74] = it }
+                v("EQ_Master_Low")?.let { cab[70] = it }
+                v("EQ_Master_LowMid")?.let { cab[73] = it }
+                v("EQ_Master_HighMid")?.let { cab[77] = it }
+                v("EQ_Master_High")?.let { cab[81] = it }
+                v("EQ_Master_LowCut")?.let { cab[57] = it }
+                v("EQ_Master_HighCut")?.let { cab[67] = it }
+                v("EQ_Master_LowCutToggle")?.let { cab[66] = it }
+                v("EQ_Master_HighCutToggle")?.let { cab[82] = it }
+            }
+            
+            val p = LocalPreset("arch-${System.currentTimeMillis()}", name, amp.toList(), cab.toList())
+            persist((presetsMutable.value + p).distinctBy { it.id })
+            return "Importato preset Architect: $name"
+        }
+        
+        val root=JSONObject(data); require(root.getString("format")=="amped-usb-library-v1") { "Formato non riconosciuto" }
         val imported=LocalPreset.parseList(root.getJSONArray("presets").toString())
         val list=(presetsMutable.value+imported).distinctBy { it.id }
         persist(list); "Importati ${imported.size} preset"
