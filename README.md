@@ -25,7 +25,6 @@ Born out of the frustration of needing a desktop PC to modify CabRig settings or
 - **CabRig Deep Dive:** Access hidden parameters not available on the physical pedal. Swap between all 23 Cabinets, 6 Microphones, toggle Axis, Stereo Width, Room Type, and master levels.
 - **Logarithmic EQ Sweeps:** The Low-Cut and High-Cut filters have been mathematically mapped to display actual, usable frequencies (Hertz) instead of raw 0-255 MIDI values (e.g., Low-Cut from 20Hz to 400Hz).
 - **Physical "Tolex" Aesthetic:** The UI mimics the physical head. When you adjust the Gain, watch the slider track heat up with an intense, glowing tube-valve gradient!
-- **Simulation Mode:** No amp nearby? Tap "Simula" in the settings to activate *Ghost Mode*. The UI instantly unlocks with simulated dummy data, allowing you to build patches, test layouts, and review EQ settings offline.
 - **Preset Management (.amped & .cabrig):** Import official XML patches from Architect Desktop directly into your phone. Burn them into the 3 hardware slots, or keep an unlimited number of patches stored locally on your device!
 
 ---
