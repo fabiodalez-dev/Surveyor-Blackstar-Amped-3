@@ -94,15 +94,17 @@ To change channels (slots), send `0x11` (Amp slots) or `0x01` (Cab slots) encaps
 
 ---
 
-## 🚀 Installation and Build
+## 🚀 Installation
 
-This is a native Android application built with Kotlin and Jetpack Compose.
+You don't need Android Studio or a PC to install Surveyor! 
 
-1. Clone the repository.
-2. Open the project in Android Studio.
-3. Build and deploy to your Android device (`./gradlew assembleDebug`).
-4. Connect your AMPED 3 via a USB-C OTG cable.
-5. Grant USB permissions when prompted by Android.
+1. Go to the **[Releases](../../releases/latest)** page on this GitHub repository.
+2. Download the latest `Surveyor-vX.X.X.apk` file directly to your Android device.
+3. Open the downloaded APK and tap **Install** (you may need to allow "Install from Unknown Sources" in your Android settings).
+4. Connect your AMPED 3 pedal to your phone using a USB-C OTG cable.
+5. Open Surveyor and grant USB permissions when prompted. You're ready to rock!
+
+*(For developers: You can clone this repository and build it locally using Android Studio and `./gradlew assembleDebug`).*
 
 ---
 
