@@ -269,6 +269,8 @@ fun T(it: String, en: String) = if (lang == "it") it else en
     FlowRow(Modifier.fillMaxWidth(), horizontalArrangement=Arrangement.SpaceEvenly) { listOf("Low" to 70,"Low mids" to 73,"High mids" to 77,"High" to 81).forEach {(label,index)->
         if (s.cab.getOrNull(74) != 1) Parameter(label,s.cab[index],255,s.synced&&!s.busy,{"%+.1f dB".format(Locale.US,(it-128)*10f/127)}){c.setParameter(true,index,it)}
     } }
+    Box(Modifier.fillMaxWidth(), contentAlignment=Alignment.Center) { Parameter(T("Livello Cassa", "Cabinet Level"), s.cab.getOrNull(AmpedProtocol.CAB_CABINET_LEVEL) ?: 0, 127, s.synced && !s.busy, format = { "%+.1f dB".format(java.util.Locale.US, AmpedProtocol.levelDb(it)) }) { c.setParameter(true, AmpedProtocol.CAB_CABINET_LEVEL, it) } }
+
     Section(T("Stanza (Room)", "Room"))
     Row(verticalAlignment = Alignment.CenterVertically) {
         Checkbox(checked = s.cab.getOrNull(58) == 1, onCheckedChange = { c.setParameter(true, 58, if (it) 1 else 0) }, enabled = s.synced && !s.busy)
@@ -278,7 +280,7 @@ fun T(it: String, en: String) = if (lang == "it") it else en
     }
     Choices("Tipo di Stanza", s.cab.getOrNull(56) ?: 0, listOf("Small" to 0, "Small Damped" to 1, "Medium" to 2, "Medium Damped" to 3, "Large" to 4, "Large Damped" to 5), s.synced && !s.busy) { c.setParameter(true, 56, it) }
     Choices(T("Ampiezza Stereo", "Stereo Width"), s.cab.getOrNull(60) ?: 0, listOf("Mono" to 0, "Stereo" to 1, "Wide" to 2), s.synced && !s.busy) { c.setParameter(true, 60, it) }
-    Box(Modifier.fillMaxWidth(), contentAlignment=Alignment.Center) { Parameter(T("Livello Room", "Room Level"), s.cab.getOrNull(AmpedProtocol.CAB_ROOM_LEVEL) ?: 0, 127, s.synced && !s.busy) { c.setParameter(true, AmpedProtocol.CAB_ROOM_LEVEL, it) } }
+    Box(Modifier.fillMaxWidth(), contentAlignment=Alignment.Center) { Parameter(T("Livello Room", "Room Level"), s.cab.getOrNull(AmpedProtocol.CAB_ROOM_LEVEL) ?: 0, 127, s.synced && !s.busy, format = { "%+.1f dB".format(java.util.Locale.US, AmpedProtocol.levelDb(it)) }) { c.setParameter(true, AmpedProtocol.CAB_ROOM_LEVEL, it) } }
     
     Section("Filtri (Cut)")
     Row(verticalAlignment = Alignment.CenterVertically) {

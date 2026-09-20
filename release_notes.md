@@ -1,33 +1,24 @@
-### Surveyor v1.2.0 — parameter map verified on the hardware
+### Surveyor v1.3.0 — Cabinet Level, and levels in real decibels
 
-This release is mostly about being able to trust what the app sends. Every parameter offset was checked against a physical AMPED 3 with Architect open, and two of them turned out to be wrong.
+#### Cabinet Level is now in the app
 
-#### Fixed: the two cut filters were swapped
+Architect has always had it; Surveyor did not. Offset 3 was mapped and verified during the previous release but left out of the UI because there was no hardware on hand to test it. It is in now, next to the cabinet controls, and it was tested on a physical AMPED 3: the app's own packet written to the pedal, read back, and the whole CabRig block compared byte for byte afterwards.
 
-The slider labelled **Low-Cut** wrote the high-cut offset, and the one labelled **High-Cut** wrote the low cut. Anyone who adjusted either control was moving the other filter. Offset 67 is the low cut and 83 is the high cut, established by moving one Architect control at a time with the USB traffic captured, and corroborated by the factory EQ presets: "Cocked Wah" keeps only midrange with 67 at its maximum and 83 near its minimum. A unit test now fails if the two are ever swapped again.
+#### Cabinet and Room levels read in decibels
 
-The hertz figures shown for those filters are printed with a leading `~` from now on. Architect displays only a 0-10 knob position and never a frequency, so the mapping is a sensible estimate, not a measurement.
+Both controls used to show a raw 0-255 number. They now show decibels, from a scale calibrated against the hardware rather than guessed: stepping the Architect sliders one notch at a time and pairing each readout with the byte sent gives `dB = raw x 24 / 127 - 12`, which reproduces all fifteen measured readouts exactly. The byte range spans -12 to +12 dB.
 
-#### Fixed: Italian text in the English UI
+The Master level is deliberately left as a raw value. Its taper is non-linear and heads to -INF — stepping down from 105 gives 0.0, -0.2, -0.5, -0.8, -1.0, -1.4 dB — and a number that looks precise but is invented is worse than an honest raw one.
 
-The status line, the errors and the save messages were hardcoded in Italian and appeared that way regardless of the selected language. All of them are translated now.
+#### Local presets restore what the UI exposes
 
-#### Verified, and documented in docs/PROTOCOL_VERIFICATION.md
+Loading a saved preset used to restore only the four EQ bands on the CabRig side, so cabinet level, room level and the two cut filters silently stayed where they were. All of those are restored now. Every offset involved was write-tested on the hardware.
 
-- All ten continuous amplifier parameters, by reading the values Architect displays and matching them against the pedal's own live block. Each knob matched exactly one offset out of fifty-two, every residual under half a step, with nothing written to the amp.
-- Power, valve response, boost position, reverb character and the three channel voicings, against what Architect showed at the same moment.
-- Reverb on/off is offset 33; boost is bit 6 of offset 32, and both accept writes.
-- `02 11 <slot>` really does recall a stored preset, and the 15-byte stored format is the first nine live parameters followed by power and valve response.
-- The live state was compared byte for byte before and after the session: all 52 amplifier bytes and all 84 CabRig bytes identical, and no permanent slot was written.
-
-#### Fixed: the offline tool refused three factory profiles
-
-`tools/cabrig_dsp.py` rejected 7:5:0, 22:5:0 and 22:5:1 as unstable. Their section 15 quantises to a real pole at exactly z = 1, cancelled by that section's own zero — marginal by construction and shipped by Blackstar. The rule is now that output may not be less stable than its source, which still refuses genuine instability. `tools/test_cabrig_dsp.py` covers it.
+Master level stays out on purpose, for the same reason the amplifier's Master does: loading a preset should not change how loud the rig is.
 
 #### Also
 
-- Verified offsets are named constants instead of numbers scattered through the UI.
-- Cabinet Level (offset 3) is mapped but not yet exposed in the UI.
-- 17 unit tests, all passing.
+- 20 unit tests, all passing. The level conversion is pinned to the measured readouts, so changing it has to answer to the hardware.
+- `docs/PROTOCOL_VERIFICATION.md` carries the calibration table and the write test.
 
-**Download `Surveyor-v1.2.0.apk` below.** Android 8.0 or newer, USB-OTG cable required.
+**Download `Surveyor-v1.3.0.apk` below.** Android 8.0 or newer, USB-OTG cable required.

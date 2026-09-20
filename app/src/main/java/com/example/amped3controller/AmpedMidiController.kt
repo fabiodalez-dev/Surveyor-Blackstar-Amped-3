@@ -337,7 +337,7 @@ class AmpedMidiController(private val context: Context) {
         commands.offer {
             // Master and power are deliberately left at their current hardware setting.
             for (i in listOf(0,1,2,3,4,5,6,7,8,22,24,25,26,27,28)) write(AmpedProtocol.parameter(false,i,p.amp[i]))
-            for (i in AmpedProtocol.cabEqBands) write(AmpedProtocol.parameter(true,i,p.cab[i]))
+            for (i in AmpedProtocol.cabPresetOffsets) write(AmpedProtocol.parameter(true,i,p.cab[i]))
             if (coeff != null) transfer(coeff) else { mutable.update { it.copy(busy=false) }; startSync() }
         }
     }

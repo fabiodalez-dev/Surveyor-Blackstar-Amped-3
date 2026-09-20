@@ -40,6 +40,20 @@ For CabRig the values on screen are not all numbers, so each control was nudged 
 
 **The two cut frequencies were swapped in the app and in the README.** The slider labelled Low-Cut wrote offset 83. The factory EQ presets shipped in `AmpedProtocol.kt` corroborate the correction independently: "Treble Boost" turns both filters off and leaves 67 at its minimum and 83 at its maximum, while "Cocked Wah" keeps only midrange with 67 at 255 and 83 at 17. `CutOffsetsTest` now locks this down.
 
+## Level calibration — 21 September 2026
+
+Stepping the Architect sliders one notch at a time and pairing each readout with the byte sent gives the Cabinet and Room level scale outright:
+
+| Byte | 71 | 72 | 73 | 74 | 75 | 76 | 77 | 78 | 79 | 80 | 81 | 82 | 83 | 84 | 85 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| Architect | 1.4 | 1.6 | 1.8 | 2.0 | 2.2 | 2.4 | 2.6 | 2.7 | 2.9 | 3.1 | 3.3 | 3.5 | 3.7 | 3.9 | 4.1 |
+
+`dB = raw x 24 / 127 - 12` reproduces all fifteen readouts, so the byte range spans -12 to +12 dB. The same formula holds for both offsets, 3 and 57, which is why the app now prints decibels for each.
+
+The Master level at offset 65 does **not** follow it. Stepping down from 105 gives 0.0, -0.2, -0.5, -0.8, -1.0 and -1.4 dB: an uneven, non-linear fader taper heading to -INF, which a straight line cannot describe. Rather than print a number that would be wrong, the app leaves that control raw.
+
+Writing was then checked on the hardware for every offset a local preset restores — 3, 57, 66, 67, 70, 73, 77, 81, 82, 83 — using exactly the packet the app sends. Each accepted the write and read back the value, and the CabRig block was byte-identical to its starting state afterwards.
+
 ## Slot recall
 
 `02 11 <slot>` does load the stored preset. After sending it for slot 2, the live parameters became exactly that slot's stored bytes, while Master stayed where it was because the compact format does not store it. Sending it for slot 1 restored the original state exactly.
