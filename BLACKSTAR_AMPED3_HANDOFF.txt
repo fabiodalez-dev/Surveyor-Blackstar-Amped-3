@@ -1,0 +1,372 @@
+BLACKSTAR AMPED 3 / SURVEYOR - HANDOFF TECNICO COMPLETO
+========================================================
+
+Ultimo aggiornamento: 20 settembre 2026
+Repository: https://github.com/fabiodalez-dev/Surveyor-Blackstar-Amped-3
+Branch: main
+Cartella locale: /Users/fabio/Documents/GitHub/Blackstar/AmpedController
+Package Android: com.example.amped3controller
+Hardware analizzato: Blackstar AMPED 3, firmware 1.03
+Software di riferimento: Blackstar Architect 2.1.3 per macOS
+USB: VID 0x27d4, PID 0x0072
+
+
+1. STATO DEL PROGETTO
+---------------------
+
+L'app Android controlla AMPED 3 tramite USB HID e cavo USB dati/OTG. Legge lo
+stato corrente, modifica i parametri AMP e CabRig, richiama i tre slot AMP e i
+tre slot CabRig, trasferisce i profili DSP CabRig e salva preset sulla pedaliera.
+
+La matrice CabRig è completa:
+
+  24 casse/DI x 6 microfoni x 2 assi = 288 combinazioni
+
+Il file app/src/main/assets/cab_profiles.json contiene tutte le combinazioni.
+Sono presenti 276 payload DSP distinti: alcune combinazioni condividono
+intenzionalmente gli stessi coefficienti.
+
+Nella pagina CabRig dell'app sono disponibili tre selettori separati:
+
+  - Cassa: 24 scelte, inclusa DI
+  - Microfono: 57 Dynamic, 421 Dynamic, 67 Condenser, 414 Condenser,
+    121 Ribbon, 160 Ribbon
+  - Asse: On Axis oppure Off Axis
+
+I selettori sono utilizzabili anche senza pedaliera collegata. Il pulsante
+"Applica profilo DSP" si abilita solo dopo collegamento e sincronizzazione USB.
+
+
+2. APK E BUILD
+--------------
+
+APK di debug corrente:
+
+  app/build/outputs/apk/debug/app-debug.apk
+
+Comandi di build e installazione:
+
+  cd /Users/fabio/Documents/GitHub/Blackstar/AmpedController
+  ./gradlew testDebugUnitTest lintDebug assembleDebug
+  adb devices -l
+  adb -s DEVICE_SERIAL install -r app/build/outputs/apk/debug/app-debug.apk
+  adb -s DEVICE_SERIAL shell am force-stop com.example.amped3controller
+  adb -s DEVICE_SERIAL shell monkey -p com.example.amped3controller 1
+
+Ultimo telefono usato:
+
+  seriale Q4BQ45QWSCXKPFHY
+  modello Xiaomi 23090RA98G
+
+La build, i test unitari e Android Lint sono passati. L'APK è stato installato
+e avviato sul telefono fisico. È stato inoltre verificato via UIAutomator che
+il menu delle casse si apre e permette di selezionare, per esempio,
+"1x10 Classic USA Combo" anche offline.
+
+
+3. SICUREZZA DEI PRESET E BACKUP
+--------------------------------
+
+Non sovrascrivere mai uno slot prima di averlo letto e salvato localmente.
+
+L'app esegue ora questa procedura prima di ogni salvataggio hardware:
+
+  1. legge lo slot di destinazione;
+  2. scrive il backup locale;
+  3. forza fsync del backup;
+  4. invia dati e nome;
+  5. per CabRig attende anche l'ACK 0xAF;
+  6. rilegge lo slot dalla pedaliera;
+  7. verifica nome e dati;
+  8. dichiara successo solo se la verifica coincide.
+
+Limiti dei nomi osservati:
+
+  - nome CabRig: massimo 21 caratteri ASCII
+  - nome AMP: massimo 23 caratteri ASCII
+
+È stata eseguita una verifica fisica diretta via Mac HID:
+
+  PASS backup persistente dei sei slot
+  PASS modifica, salvataggio e richiamo AMP slot 1
+  PASS ripristino AMP slot 1
+  PASS modifica, salvataggio e richiamo CabRig slot 3
+  PASS ripristino CabRig slot 3
+  PASS ripristino byte-per-byte di tutti i sei slot
+  PASS ripristino dei parametri live originari
+
+Backup della prova, conservato fuori dal repository:
+
+  /Users/fabio/Documents/GitHub/Blackstar/backups/storage-verification-20260920.json
+
+Log della prova:
+
+  /Users/fabio/Documents/GitHub/Blackstar/research/storage-verification.log
+
+Strumento ripetibile:
+
+  tools/verify_slot_storage.py
+
+Procedure dettagliate:
+
+  docs/STORAGE_VERIFICATION.md
+
+Non sono ancora state completate due prove finali:
+
+  - spegnimento e riaccensione fisica per confermare la ritenzione;
+  - intero ciclo di salvataggio con la pedaliera collegata direttamente ad
+    Android via OTG.
+
+
+4. PROTOCOLLO USB HID
+---------------------
+
+AMPED 3 comunica con report HID da 64 byte. I comandi principali osservati sono:
+
+  0x16  parametri AMP
+  0xA9  parametri CabRig modificabili singolarmente
+  0xAA  intestazione trasferimento DSP CabRig
+  0xAB  richiesta/negoziazione dei blocchi CabRig
+  0xAC  blocchi contenenti coefficienti DSP
+  0xAF  acknowledgement del trasferimento CabRig
+
+Un comando parametro segue questa forma generale:
+
+  [CMD] [OFFSET_LO] [OFFSET_HI] [COUNT] [VALUES...] [ZERO PADDING]
+
+Esempio AMP Gain a 127:
+
+  16 00 00 01 7F
+
+Esempio CabRig Room Level a 127:
+
+  A9 39 00 01 7F
+
+Parametri CabRig confermati:
+
+  offset 57 / 0x39  Room Level          0..127
+  offset 66 / 0x42  Low Cut enable      0..1
+  offset 67 / 0x43  High Cut frequency  0..255
+  offset 82 / 0x52  High Cut enable     0..1
+  offset 83 / 0x53  Low Cut frequency   0..255
+
+Il Room Level non deve superare 127.
+
+Le implementazioni del protocollo sono principalmente in:
+
+  app/src/main/java/com/example/amped3controller/AmpedProtocol.kt
+  app/src/main/java/com/example/amped3controller/AmpedMidiController.kt
+
+
+5. FORMATO DEL TRASFERIMENTO CABRIG
+----------------------------------
+
+Ogni profilo usa:
+
+  - un report 0xAA con payload di intestazione da 12 byte;
+  - cinque report 0xAC;
+  - dati utili dei cinque blocchi: 60 + 60 + 60 + 60 + 20 = 260 byte.
+
+Formato generale dei report 0xAA/0xAC:
+
+  byte 0      opcode
+  byte 1..2   CRC-16/XMODEM big-endian del payload del report
+  byte 3      lunghezza del payload, da 1 a 60
+  byte 4..    payload
+  resto       padding a zero fino a 64 byte
+
+Intestazione 0xAA, campi confermati:
+
+  payload 0..1  CRC-16/XMODEM little-endian dell'intero blocco da 260 byte
+  payload 2..3  lunghezza little-endian: 260
+  payload 4..5  numero blocchi little-endian: 5
+  altri byte    metadati non ancora completamente identificati
+
+Tutti i 288 profili superano entrambi i livelli di checksum.
+
+Lo script tools/extract_cab_profiles.py ricostruisce la libreria da una cattura
+HID e rifiuta l'output se non trova tutte le 288 combinazioni, la sequenza AB
+0..4 prevista e i cinque blocchi AC da 64 byte.
+
+
+6. NATURA DEI DATI DSP: NON SONO UN FILE IR AUDIO
+-------------------------------------------------
+
+I 260 byte sono esattamente 65 float32 little-endian finiti. Non sono campioni
+PCM, un WAV o una impulse response lunga pronta per convoluzione.
+
+Nel binario di Architect sono presenti i simboli/stringhe:
+
+  DSP_BLOCK_BiquadFilter_init
+  DSP_Block_BiquadFilter.c
+  ercoefs
+  CabRigCoeffsBase
+
+Il disassemblato della conversione dei coefficienti mostra:
+
+  - massimo 16 sezioni;
+  - quattro float in ingresso per sezione;
+  - uso di cosf;
+  - una moltiplicazione per -2;
+  - quattro float prodotti per sezione.
+
+La struttura più coerente è quindi:
+
+  1 coefficiente diretto + 16 sezioni ricorsive del secondo ordine x 4 float
+  = 65 float
+
+I raggi dei poli calcolati con l'interpretazione del denominatore
+1 + a1*z^-1 + a2*z^-2 risultano inferiori a 1 nei profili esaminati, coerenti
+con filtri IIR stabili.
+
+Il disassemblato completo è conservato in:
+
+  /Users/fabio/Documents/GitHub/Blackstar/research/cab-coeff-disassembly.txt
+
+La topologia esatta (sezioni parallele o altra somma), il sample rate, l'ordine
+dei coefficienti e la normalizzazione del guadagno richiedono ancora una misura
+audio della risposta hardware. La topologia parallela usata dallo strumento di
+ricerca è un'ipotesi, non un fatto definitivamente provato.
+
+
+7. PROFILI CUSTOM E IMPORTAZIONE DI IR
+--------------------------------------
+
+Strumento offline:
+
+  tools/cabrig_dsp.py
+
+Funzioni già implementate:
+
+  - decodifica dei report;
+  - verifica dei checksum;
+  - estrazione dei 65 float;
+  - controllo della stabilità dei poli dopo quantizzazione float32;
+  - modifica sicura del guadagno dei numeratori;
+  - ricostruzione dei report e di entrambi i livelli di CRC;
+  - fit sperimentale di un WAV mono sul banco di poli di un profilo esistente.
+
+Esempio di attenuazione strutturalmente valida:
+
+  python3 tools/cabrig_dsp.py app/src/main/assets/cab_profiles.json \
+    --key 21:5:0 --attenuate-db -6 --output /tmp/custom-cab.json
+
+Il fit di una IR non carica campioni audio nella pedaliera. Approssima la IR
+modificando i pesi/numeratori delle sezioni ricorsive disponibili. Una struttura
+di 16 sezioni può approssimare curve di cabinet e risonanze, ma non può riprodurre
+esattamente una IR arbitraria con code lunghe, riflessioni o ritardi complessi.
+
+Esperimenti sensati, in ordine prudente:
+
+  1. trasferire un profilo originale ricostruito e verificarne l'identità sonora;
+  2. trasferire solo una versione attenuata senza salvarla in uno slot;
+  3. misurare ingresso/uscita con sweep logaritmico;
+  4. determinare sample rate, topologia e normalizzazione reali;
+  5. costruire morph tra profili esistenti con controllo di stabilità e guadagno;
+  6. provare fit di IR corte e confrontare la risposta misurata;
+  7. abilitare nell'app l'importazione custom solo dopo queste verifiche.
+
+Ogni prova deve partire dal backup dei tre slot CabRig. Inizialmente caricare il
+profilo solo nel DSP attivo e non inviare il comando di salvataggio persistente.
+
+
+8. EFFETTI AGGIUNTIVI E LIMITI DELL'HACK
+----------------------------------------
+
+La tabella CabRig descrive il modello di cassa/filtro. Non contiene il codice
+degli algoritmi di drive, riverbero, delay, modulazioni o firmware.
+
+Non è quindi possibile caricare un nuovo effetto software attraverso i pacchetti
+CabRig già scoperti. Per aggiungere algoritmi realmente nuovi servirebbe:
+
+  - trovare un altro protocollo/modulo firmware non ancora analizzato;
+  - modificare il firmware, con rischio elevato di brick;
+  - oppure usare un processore DSP/audio esterno nella catena.
+
+Gli hack più realistici con il protocollo attuale sono nuove curve di cabinet,
+EQ custom, smorzamento delle risonanze, variazioni di gain normalizzate e morph
+tra modelli. Non dichiarare supporto a IR custom nell'interfaccia pubblica prima
+della verifica audio fisica.
+
+
+9. TEST AUTOMATICI E FILE IMPORTANTI
+------------------------------------
+
+Test principali:
+
+  app/src/test/java/com/example/amped3controller/AmpedProtocolTest.kt
+  app/src/test/java/com/example/amped3controller/CabProfilesAssetTest.kt
+  app/src/test/java/com/example/amped3controller/HardwareSavePacketTest.kt
+
+Documentazione:
+
+  README.md
+  docs/STORAGE_VERIFICATION.md
+  docs/CABRIG_DSP_FORMAT.md
+  BLACKSTAR_AMPED3_HANDOFF.txt
+
+Strumenti:
+
+  tools/extract_cab_profiles.py
+  tools/verify_slot_storage.py
+  tools/cabrig_dsp.py
+
+Asset importanti:
+
+  app/src/main/assets/cab_profiles.json
+  app/src/main/assets/original_backup.json
+
+
+10. PROCEDURA PER CONTINUARE IL LAVORO
+--------------------------------------
+
+Prima di iniziare:
+
+  1. verificare `git status` e non cancellare modifiche locali dell'utente;
+  2. copiare i backup fuori dall'app e dal repository;
+  3. collegare un solo host alla pedaliera: Mac oppure telefono, non entrambi;
+  4. chiudere Architect prima di aprire direttamente il device HID da script;
+  5. leggere e salvare tutti gli slot prima di ogni scrittura;
+  6. evitare salvataggi persistenti durante gli esperimenti DSP iniziali.
+
+Verifica del repository:
+
+  cd /Users/fabio/Documents/GitHub/Blackstar/AmpedController
+  git status --short --branch
+  ./gradlew testDebugUnitTest lintDebug assembleDebug
+
+Per la prova Android reale:
+
+  1. installare l'APK;
+  2. scollegare il telefono dal Mac;
+  3. collegare AMPED 3 direttamente al telefono con cavo dati/OTG;
+  4. accettare il permesso USB Android;
+  5. premere Connect;
+  6. verificare che i valori live coincidano con la pedaliera;
+  7. scegliere cassa, microfono e asse;
+  8. applicare il profilo senza salvarlo;
+  9. verificare il suono e il ritorno dello stato;
+ 10. per testare Save, usare uno slot già sottoposto a backup;
+ 11. rileggere lo slot, spegnere e riaccendere, rileggere di nuovo;
+ 12. ripristinare il backup originario e verificarlo byte-per-byte.
+
+
+11. COMMIT CHIAVE
+-----------------
+
+  179f875  feat: add complete CabRig profile matrix
+  f165595  fix: back up and verify hardware preset saves
+  4e83da5  feat: expose all CabRig profiles and document DSP format
+  9abb213  fix: allow offline CabRig profile selection
+
+
+12. CONCLUSIONI ACCERTATE
+-------------------------
+
+La comunicazione, il recupero degli slot, il salvataggio diretto via Mac HID,
+il richiamo e il ripristino sono stati verificati fisicamente. La libreria
+CabRig comprende tutte le 288 combinazioni e l'app le espone. Il payload CabRig
+è un modello compatto a coefficienti ricorsivi, non un file audio IR. Possiamo
+creare pacchetti custom corretti dal punto di vista strutturale e dei checksum;
+la loro risposta sonora deve essere verificata con misure hardware prima di
+considerare stabile l'importazione di suoni custom.
