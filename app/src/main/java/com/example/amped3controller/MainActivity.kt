@@ -224,7 +224,7 @@ fun T(it: String, en: String) = if (lang == "it") it else en
     Text("Profili DSP completi: 288/288 · 24 casse × 6 microfoni × 2 assi",color=Muted,fontSize=12.sp)
     Text(T("Cassa", "Cabinet"), color=Muted, fontSize=12.sp, fontWeight=FontWeight.Bold)
     Box(modifier = Modifier.fillMaxWidth()) {
-        OutlinedButton(onClick={cabinetExpanded=true}, enabled=s.synced&&!s.busy, modifier=Modifier.fillMaxWidth()) {
+        OutlinedButton(onClick={cabinetExpanded=true}, enabled=!s.busy, modifier=Modifier.fillMaxWidth()) {
             Text(AmpedProtocol.cabinetNames[cabinet])
         }
         DropdownMenu(expanded=cabinetExpanded,onDismissRequest={cabinetExpanded=false}) {
@@ -238,6 +238,7 @@ fun T(it: String, en: String) = if (lang == "it") it else en
     Text("Selezionato: ${AmpedProtocol.cabinetNames[cabinet]} · ${listOf("57 Dyn","421 Dyn","67 Cond","414 Cond","121 Rib","160 Rib")[mic]} · ${if(axis==0)"On Axis" else "Off Axis"}",color=Muted,fontSize=12.sp)
     Text("Attuale: $name · ${listOf("57 Dyn","421 Dyn","67 Cond","414 Cond","121 Rib","160 Rib").getOrNull(s.cab[1])?:"—"} · ${if(s.cab[2]==0)"On Axis" else if(s.cab[2]==1)"Off Axis" else "—"}",color=Muted,fontSize=12.sp)
     Button(onClick={c.chooseCab(cabinet,mic,axis)},enabled=s.synced&&!s.busy,modifier=Modifier.fillMaxWidth()){Text("Applica profilo DSP")}
+    if (!s.synced) Text("Collega AMPED 3 via USB OTG e premi Connect per applicare il profilo selezionato.", color=Muted, fontSize=12.sp)
     Row(verticalAlignment = Alignment.CenterVertically) {
         Checkbox(checked = s.cab.getOrNull(5) == 1, onCheckedChange = { c.setParameter(true, 5, if (it) 1 else 0) }, enabled = s.synced && !s.busy)
         Text("Solo", modifier = Modifier.padding(start = 4.dp, end = 16.dp))
