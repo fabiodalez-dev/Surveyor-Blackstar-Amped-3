@@ -14,6 +14,7 @@ Born out of the frustration of needing a desktop PC to modify CabRig settings or
 
 ## 🎸 Features
 
+- **Built to be read on stage:** values are set in large tabular figures, the controls are drag-only so a brush against the screen cannot slam your gain to maximum, and the gain fader glows from yellow to red as it climbs. The cabinet panel draws the cabinet you have selected, so a 2x12 looks like a 2x12.
 - **No Desktop PC Required:** Connect your Android device directly to the AMPED over USB-OTG. The app reads the amp's actual state on connect and re-reads it after every write, so the controls show hardware values instead of assumed ones. Round-trip latency has not been measured, and not every physical knob reports its movement on its own, so a manual resync covers that case.
 - **CabRig DSP Protocol Decoded:** Surveyor ships all 288 factory CabRig DSP profiles, extracted from captures of my own unit and validated against both checksum layers. I decoded the 260-byte payload format itself: it is a 16-section recursive filter cascade described by 65 float32 values, not a convolution of a stored impulse response.
 - **Custom Profile Tools (experimental):** The offline Python tool `tools/cabrig_dsp.py` builds structurally valid non-factory profiles: it rebuilds both checksum layers, verifies pole stability after float32 quantisation, and its `--fit-ir` mode fits a WAV impulse response by solving the 33 numerator weights over the fixed pole bank of a factory profile. The resulting packets are valid by construction; their sound has not been measured yet, so treat fitted profiles as an experiment, not a feature.
@@ -70,7 +71,7 @@ Switch offsets, each confirmed against what Architect showed at the same moment:
 
 | Offset (Dec) | Offset (Hex) | Parameter        | Observed values |
 |--------------|--------------|------------------|-----------------|
-| 21           | 0x15         | Power            | 1 = 100 W confirmed; 2 and 3 are 1 W / 20 W in some order |
+| 21           | 0x15         | Power            | 1 = 100 W, 3 = 20 W, 2 = 1 W, all three read off Architect's own control |
 | 22           | 0x16         | Response (valve) | 1 = 6L6, 2 = EL84, 3 = EL34 |
 | 24           | 0x18         | Boost Position   | 0 = Post, 1 = Pre |
 | 25           | 0x19         | Reverb Character | 0 = Light, 1 = Dark |
@@ -80,7 +81,7 @@ Switch offsets, each confirmed against what Architect showed at the same moment:
 | 32           | 0x20         | Channel + boost  | Bit 6 (64) is Boost, writable and verified. The low bits track the channel; 1, 8 and 32 were all observed and the encoding is not settled |
 | 33           | 0x21         | Reverb on/off    | 0 or 1 |
 
-Power is not exposed in the UI because only the 100 W value is pinned down. Offsets 10, 23, 40 and 41 hold unidentified state; 32 and 41 ignore writes and report values of the amp's own choosing. Preset import restores the continuous parameters, response and the two character switches, and skips channel/voice selection — the code says so explicitly rather than pretending otherwise.
+Power is now exposed in the UI, its three values having been read off Architect one step at a time. Offsets 10, 23, 40 and 41 hold unidentified state; 32 and 41 ignore writes and report values of the amp's own choosing. Preset import restores the continuous parameters, response and the two character switches, and skips channel/voice selection — the code says so explicitly rather than pretending otherwise.
 
 ### CabRig DSP Format & Custom IRs (`0xaa` Bulk Transfers)
 

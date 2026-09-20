@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Lo splash di sistema maschera l'icona dentro un cerchio: il marchio Surveyor e' largo e
+     verrebbe tagliato. Qui resta solo il fondo carbone, e il logo entra con l'animazione
+     dell'app (vedi Accensione in MainActivity), che non ha quel vincolo di forma. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <solid android:color="@android:color/transparent" />
+</shape>

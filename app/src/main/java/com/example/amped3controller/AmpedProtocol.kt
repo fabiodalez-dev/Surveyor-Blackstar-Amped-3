@@ -31,6 +31,16 @@ object AmpedProtocol {
      *  The Master level (offset 65) uses a different, non-linear fader taper and is left raw. */
     fun levelDb(raw: Int) = raw * 24.0 / 127.0 - 12.0
 
+    /** Power selector, decoded on the hardware on 2026-09-21 by stepping Architect's own control
+     *  and reading the byte it sent: 100 W first, then 20 W, then 1 W. */
+    const val AMP_POWER = 21
+    val powerOptions = listOf("100W" to 1, "20W" to 3, "1W" to 2)
+
+    /** CabRig EQ bands as decibels. The band bytes span -10..+10 dB with the midpoint between 127
+     *  and 128, which is what reproduces Architect's readouts: 89 shows -3.0, 123 shows -0.4,
+     *  155 shows 2.2 and 157 shows 2.3. The older (raw-128)*10/127 was out by up to a tenth. */
+    fun eqDb(raw: Int) = (raw - 127.5) / 12.75
+
     const val AMP_STATUS = 32
     const val AMP_BOOST_BIT = 64
     const val AMP_REVERB_ON = 33
@@ -70,6 +80,61 @@ object AmpedProtocol {
         "Ribbon 121" to mapOf(70 to 89, 73 to 127, 77 to 127, 81 to 127, 66 to 0, 82 to 1, 67 to 0, 83 to 134),
         "Ribbon 160" to mapOf(70 to 89, 73 to 127, 77 to 127, 81 to 127, 66 to 0, 82 to 1, 67 to 0, 83 to 134)
     )
+    /** The 65 float32 coefficients carried by a cabinet profile's five data chunks. */
+    fun coefficients(chunks: List<String>): FloatArray? {
+        val payload = ArrayList<Byte>(260)
+        for (c in chunks) {
+            val raw = decodeHex(c)
+            if (raw.size != 64) return null
+            val length = raw[3].toInt() and 255
+            if (length > 60) return null
+            for (i in 0 until length) payload.add(raw[4 + i])
+        }
+        if (payload.size != 260) return null
+        val out = FloatArray(65)
+        for (i in 0 until 65) {
+            var bits = 0
+            for (b in 3 downTo 0) bits = (bits shl 8) or (payload[i * 4 + b].toInt() and 255)
+            out[i] = Float.fromBits(bits)
+        }
+        return out
+    }
+
+    /** Magnitude of the modelled cabinet response, in dB, at each normalised frequency (f / rate).
+     *
+     *  Follows the same parallel second-order model as tools/cabrig_dsp.py: one direct term plus
+     *  sixteen sections, H = v0 + sum (b0 + b1 z) / (1 + a1 z + a2 z^2) with z = e^-j2(pi)f. That model
+     *  is a hypothesis drawn from the payload layout and Architect's coefficient routine; it has
+     *  not been confirmed against a measured sweep, so the curve is labelled as modelled. */
+    fun magnitudeDb(values: FloatArray, frequencies: DoubleArray): DoubleArray {
+        require(values.size == 65)
+        return DoubleArray(frequencies.size) { index ->
+            val angle = -2.0 * Math.PI * frequencies[index]
+            val zr = kotlin.math.cos(angle)
+            val zi = kotlin.math.sin(angle)
+            val z2r = zr * zr - zi * zi
+            val z2i = 2 * zr * zi
+            var re = values[0].toDouble()
+            var im = 0.0
+            for (s in 0 until 16) {
+                val b0 = values[1 + 4 * s].toDouble()
+                val b1 = values[2 + 4 * s].toDouble()
+                val a1 = values[3 + 4 * s].toDouble()
+                val a2 = values[4 + 4 * s].toDouble()
+                val nr = b0 + b1 * zr
+                val ni = b1 * zi
+                val dr = 1 + a1 * zr + a2 * z2r
+                val di = a1 * zi + a2 * z2i
+                val den = dr * dr + di * di
+                if (den < 1e-20) continue
+                re += (nr * dr + ni * di) / den
+                im += (ni * dr - nr * di) / den
+            }
+            val magnitude = kotlin.math.sqrt(re * re + im * im)
+            20 * kotlin.math.log10(kotlin.math.max(magnitude, 1e-9))
+        }
+    }
+
     fun decodeHex(s: String): ByteArray {
         require(s.length % 2 == 0)
         return s.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
