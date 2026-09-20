@@ -232,34 +232,74 @@ class AmpedMidiController(private val context: Context) {
         }
     }
     fun saveAmpHardware(slot: Int, name: String) {
-        if (!state.value.synced || state.value.busy || slot !in 1..3) return
-        mutable.update { it.copy(busy = true, status = "Salvataggio Amp in memoria…") }
-        commands.offer {
-            val payload = ByteArray(64)
-            payload[0] = 0x02; payload[1] = 0x13; payload[2] = slot.toByte(); payload[3] = 52.toByte()
-            System.arraycopy(state.value.amp, 0, payload, 4, 52)
-            write(payload)
-            val nameBytes = name.toByteArray(Charsets.US_ASCII)
-            val namePayload = ByteArray(64)
-            namePayload[0] = 0x02; namePayload[1] = 0x12; namePayload[2] = slot.toByte(); namePayload[3] = minOf(nameBytes.size, 60).toByte()
-            System.arraycopy(nameBytes, 0, namePayload, 4, minOf(nameBytes.size, 60))
-            write(namePayload)
-            startSync()
-        }
+        saveHardware(false, slot, name)
     }
     fun saveCabHardware(slot: Int, name: String) {
+        saveHardware(true, slot, name)
+    }
+    private fun awaitReport(timeout: Long = 3500, matches: (ByteArray) -> Boolean): ByteArray {
+        val deadline = System.currentTimeMillis() + timeout
+        while (running.get() && System.currentTimeMillis() < deadline) {
+            val report = readReport() ?: continue
+            if (matches(report)) return report
+            receive(report)
+        }
+        error("Timeout risposta USB: salvataggio non confermato")
+    }
+    private fun readStored(cab: Boolean, slot: Int): Map<String, String> {
+        val result = linkedMapOf<String, String>()
+        for (kind in if (cab) listOf(4, 5) else listOf(0x14, 0x15)) {
+            write(AmpedProtocol.packet(2, kind, slot, 0))
+            repeat(if (kind == 5) 2 else 1) {
+                val b = awaitReport { it[0] == 2.toByte() && (it[1].toInt() and 255) == kind && (it[2].toInt() and 255) == slot && (it[3].toInt() and 255) in 1..60 }
+                val count = b[3].toInt() and 255
+                result["$kind:$count"] = AmpedProtocol.hex(b.copyOfRange(4, 4 + count))
+            }
+        }
+        check(result.size == if (cab) 3 else 2) { "Backup slot incompleto" }
+        return result
+    }
+    private fun saveHardware(cab: Boolean, slot: Int, name: String) {
         if (!state.value.synced || state.value.busy || slot !in 1..3) return
-        mutable.update { it.copy(busy = true, status = "Salvataggio CabRig in memoria…") }
+        val snapshot = state.value
+        val encodedName = try { AmpedProtocol.saveNamePacket(cab, slot, name) } catch (e: IllegalArgumentException) {
+            mutable.update { it.copy(status = e.message ?: "Nome non valido") }; return
+        }
+        mutable.update { it.copy(busy = true, status = "Backup prima del salvataggio…") }
         commands.offer {
-            val burn = ByteArray(64)
-            burn[0] = 0xaf.toByte(); burn[1] = (slot - 1).toByte(); burn[2] = 0; burn[3] = 0
-            write(burn)
-            val nameBytes = name.toByteArray(Charsets.US_ASCII)
-            val namePayload = ByteArray(64)
-            namePayload[0] = 0x02; namePayload[1] = 0x02; namePayload[2] = slot.toByte(); namePayload[3] = minOf(nameBytes.size, 60).toByte()
-            System.arraycopy(nameBytes, 0, namePayload, 4, minOf(nameBytes.size, 60))
-            write(namePayload)
-            startSync()
+            try {
+                val previous = readStored(cab, slot)
+                val backup = JSONObject().put("kind", if (cab) "cab" else "amp").put("slot", slot)
+                    .put("stored", JSONObject(previous as Map<*, *>))
+                    .put("liveAmp", JSONArray(snapshot.amp)).put("liveCab", JSONArray(snapshot.cab))
+                val file = File(context.filesDir, "backup-before-save-${System.nanoTime()}.json")
+                java.io.FileOutputStream(file).use { stream ->
+                    stream.write(backup.toString(2).toByteArray(Charsets.UTF_8)); stream.fd.sync()
+                }
+                check(JSONObject(file.readText()).getJSONObject("stored").length() == previous.size)
+                log("Backup persistito: ${file.name}")
+                if (cab) write(AmpedProtocol.packet(0xaf, slot - 1, 0, 0))
+                else write(AmpedProtocol.saveAmpPacket(slot, snapshot.amp))
+                write(encodedName)
+                if (cab) awaitReport { (it[0].toInt() and 255) == 0xaf && (it[1].toInt() and 255) == slot - 1 }
+                var verified = false
+                val deadline = System.currentTimeMillis() + 4000
+                while (!verified && System.currentTimeMillis() < deadline) {
+                    val actual = readStored(cab, slot)
+                    val storedName = actual.entries.first { it.key.startsWith(if (cab) "4:" else "20:") }.value
+                    val readName = AmpedProtocol.decodeHex(storedName).takeWhile { it != 0.toByte() }.toByteArray().toString(Charsets.US_ASCII)
+                    val values = if (cab) AmpedProtocol.decodeHex(actual.getValue("5:60") + actual.getValue("5:24")).map { it.toInt() and 255 }
+                    else AmpedProtocol.decodeHex(actual.getValue("21:15")).take(9).map { it.toInt() and 255 }
+                    verified = readName == name && values == if (cab) snapshot.cab else snapshot.amp.take(9)
+                }
+                check(verified) { "Lo slot riletto non coincide: conserva il backup, non ripetere il salvataggio" }
+                log("Slot $slot verificato: nome e ${if (cab) "84 parametri CabRig" else "9 parametri AMP continui"}")
+                mutable.update { if (cab) it.copy(cabNames = it.cabNames + (slot to name)) else it.copy(ampNames = it.ampNames + (slot to name)) }
+                startSync()
+            } catch (e: Exception) {
+                log("Salvataggio non confermato: ${e.message}")
+                mutable.update { it.copy(busy = false, synced = false, status = "Salvataggio non confermato: ${e.message}") }
+            }
         }
     }
     private fun transfer(p: JSONObject) {

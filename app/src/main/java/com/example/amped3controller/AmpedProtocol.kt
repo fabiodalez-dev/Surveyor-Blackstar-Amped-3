@@ -12,6 +12,18 @@ object AmpedProtocol {
         require(offset in 0 until if (cab) 84 else 52)
         return packet(if (cab) 0xa9 else 0x16, offset, 0, 1, value)
     }
+    fun saveAmpPacket(slot: Int, values: List<Int>): ByteArray {
+        require(slot in 1..3 && values.size == 52 && values.all { it in 0..255 })
+        return packet(2, 0x13, slot, 52, *values.toIntArray())
+    }
+    fun saveNamePacket(cab: Boolean, slot: Int, name: String): ByteArray {
+        require(slot in 1..3)
+        val limit = if (cab) 21 else 23
+        require(name.isNotBlank() && name.length <= limit && name.all { it.code in 32..126 }) {
+            "Nome: da 1 a $limit caratteri ASCII stampabili"
+        }
+        return packet(2, if (cab) 2 else 0x12, slot, name.length, *name.map { it.code }.toIntArray())
+    }
     val eqPresets = mapOf(
         "Flattened" to mapOf(70 to 159, 73 to 145, 77 to 127, 81 to 109, 66 to 0, 82 to 1, 67 to 0, 83 to 127),
         "Cab In The Room" to mapOf(70 to 145, 73 to 99, 77 to 127, 81 to 154, 66 to 1, 82 to 1, 67 to 130, 83 to 106),
