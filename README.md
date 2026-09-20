@@ -26,7 +26,7 @@ Born out of the frustration of needing a desktop PC to modify CabRig settings or
 
 ## 🛠️ The Reverse Engineering Journey (Protocol Documentation)
 
-The AMPED 3 uses a proprietary, chunked USB HID protocol (`0x1036`) that differs completely from older ID:CORE amps. Through extensive packet sniffing via Wireshark and custom Python scripts, we uncovered exactly how the pedal communicates.
+The AMPED 3 uses a complex, proprietary chunked USB HID protocol (`0x1036`). Through extensive packet sniffing via Wireshark and custom Python scripts, we uncovered exactly how the pedal communicates and built this tool from the ground up to interface with it perfectly.
 
 This section outlines the reverse-engineered USB HID communication protocol for the Blackstar AMPED 3 pedal, primarily interacting via firmware version 1.03 as sniffed from Architect 2.1.3.
 
