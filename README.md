@@ -5,10 +5,16 @@
 Born out of the frustration of needing a desktop PC to modify CabRig settings or deep EQ parameters, Surveyor gives you full USB-OTG control of your amplifier directly from your Android phone or tablet.
 
 <div align="center">
-  <img src="docs/screen_amp.png" width="200"/>
-  <img src="docs/screen_cab.png" width="200"/>
-  <img src="docs/screen_presets.png" width="200"/>
-  <img src="docs/screen_settings.png" width="200"/>
+  <table>
+    <tr>
+      <td align="center"><b>Amp Controls</b><br><img src="docs/screen_amp.png" width="350"/></td>
+      <td align="center"><b>CabRig Settings</b><br><img src="docs/screen_cab.png" width="350"/></td>
+    </tr>
+    <tr>
+      <td align="center"><b>Preset Library</b><br><img src="docs/screen_presets.png" width="350"/></td>
+      <td align="center"><b>Settings & Sim</b><br><img src="docs/screen_settings.png" width="350"/></td>
+    </tr>
+  </table>
 </div>
 
 ---
