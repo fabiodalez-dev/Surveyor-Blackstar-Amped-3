@@ -32,13 +32,13 @@ Born out of the frustration of needing a desktop PC to modify CabRig settings or
 
 ## 🛠️ The Reverse Engineering Journey (Protocol Documentation)
 
-The AMPED 3 uses a complex, proprietary chunked USB HID protocol (`0x1036`). Through extensive packet sniffing via Wireshark and custom Python scripts, we uncovered exactly how the pedal communicates and built this tool from the ground up to interface with it perfectly.
+The AMPED 3 uses a proprietary chunked USB HID protocol. Through packet capture and custom Python tools, the project reconstructs the messages needed by the controller.
 
 This section outlines the reverse-engineered USB HID communication protocol for the Blackstar AMPED 3 pedal, primarily interacting via firmware version 1.03 as sniffed from Architect 2.1.3.
 
 ### Overview
 
-The AMPED 3 uses standard USB HID interrupt transfers (Report ID 1) with 64-byte payloads.
+The AMPED 3 uses 64-byte USB HID reports (VID `27d4`, PID `0072`).
 Communication consists of:
 - **`0x16` Commands:** Standard Amplifier parameters (Gain, EQ, ISF, Master).
 - **`0xa9` Commands:** CabRig individual parameters (Cut filters, Room levels).
@@ -73,7 +73,7 @@ These map 1:1 to the physical knobs on the pedal, with values ranging `0x00` (0)
 
 ### CabRig Parameters (`0xa9` and Bulk)
 
-CabRig is handled differently. Architect performs PC-side DSP processing to generate a complete Cab/Mic/Room IR profile. When changing significant parameters like Cab Type, Mic Type, Axis, or Stereo Width, Architect initiates a **bulk transfer** (`aa`, `ab`, `ac` packets) which flashes the entire generated profile to the pedal. 
+CabRig is handled differently. Architect generates a 260-byte DSP coefficient profile for each cabinet/microphone/axis choice. It is not raw audio or a conventional sampled IR. Architect sends it with a bulk transfer (`aa`, `ab`, `ac` reports); saving the Cab slot is a separate operation.
 
 The checked-in `cab_profiles.json` contains the complete 24 × 6 × 2 matrix. `tools/extract_cab_profiles.py` rebuilds the asset from a HID capture and refuses to produce an output unless all 288 combinations are present with the expected `AB 0..4` request sequence and five 64-byte `AC` chunks.
 

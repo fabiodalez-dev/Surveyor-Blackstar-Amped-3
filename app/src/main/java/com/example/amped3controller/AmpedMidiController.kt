@@ -220,7 +220,10 @@ class AmpedMidiController(private val context: Context) {
     private fun profile(cab: Int, mic: Int, axis: Int): JSONObject? = (0 until profiles.length()).map { profiles.getJSONObject(it) }.firstOrNull { it.getInt("cab")==cab && it.getInt("mic")==mic && it.getInt("axis")==axis }
     fun chooseCab(cab: Int, mic: Int, axis: Int) {
         if (!state.value.synced || state.value.busy) return
-        val p = profile(cab,mic,axis) ?: return
+        val p = profile(cab,mic,axis) ?: run {
+            mutable.update { it.copy(status = "Profilo DSP non disponibile") }
+            return
+        }
         mutable.update { it.copy(busy = true, status = "Caricamento CabRig…") }
         commands.offer { transfer(p) }
     }
