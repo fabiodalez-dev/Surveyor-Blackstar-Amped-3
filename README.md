@@ -22,7 +22,8 @@ Born out of the frustration of needing a desktop PC to modify CabRig settings or
 ## 🎸 Features
 
 - **Live USB-OTG Sync:** Connect your Android device directly to the AMPED 3 via USB. Bidirectional syncing means moving a physical knob on the amp instantly updates the app, and dragging a slider on the app instantly updates the amp.
-- **CabRig Deep Dive:** Access hidden parameters not available on the physical pedal. Swap between all 23 Cabinets, 6 Microphones, toggle Axis, Stereo Width, Room Type, and master levels.
+- **CabRig Deep Dive:** Access hidden parameters not available on the physical pedal. Swap between all 23 cabinets (plus DI), 6 microphones, toggle Axis, Stereo Width, Room Type, and master levels.
+- **Complete Cab/Mic Matrix:** The app includes all 288 DSP profiles exposed by Architect: 24 cabinet/DI choices × 6 microphones × On/Off Axis. Every profile was captured from Architect and validated as one header plus five complete DSP chunks.
 - **Logarithmic EQ Sweeps:** The Low-Cut and High-Cut filters have been mathematically mapped to display actual, usable frequencies (Hertz) instead of raw 0-255 MIDI values (e.g., Low-Cut from 20Hz to 400Hz).
 - **Physical "Tolex" Aesthetic:** The UI mimics the physical head. When you adjust the Gain, watch the slider track heat up with an intense, glowing tube-valve gradient!
 - **Preset Management (.amped & .cabrig):** Import official XML patches from Architect Desktop directly into your phone. Burn them into the 3 hardware slots, or keep an unlimited number of patches stored locally on your device!
@@ -73,6 +74,8 @@ These map 1:1 to the physical knobs on the pedal, with values ranging `0x00` (0)
 ### CabRig Parameters (`0xa9` and Bulk)
 
 CabRig is handled differently. Architect performs PC-side DSP processing to generate a complete Cab/Mic/Room IR profile. When changing significant parameters like Cab Type, Mic Type, Axis, or Stereo Width, Architect initiates a **bulk transfer** (`aa`, `ab`, `ac` packets) which flashes the entire generated profile to the pedal. 
+
+The checked-in `cab_profiles.json` contains the complete 24 × 6 × 2 matrix. `tools/extract_cab_profiles.py` rebuilds the asset from a HID capture and refuses to produce an output unless all 288 combinations are present with the expected `AB 0..4` request sequence and five 64-byte `AC` chunks.
 
 However, some specific post-EQ parameters can be manipulated individually via `0xa9` without a bulk transfer:
 
