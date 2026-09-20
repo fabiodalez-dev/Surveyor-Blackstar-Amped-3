@@ -60,11 +60,14 @@ class MainActivity : ComponentActivity() {
     override fun onDestroy(){controller.close();super.onDestroy()}
 }
 
+var lang by mutableStateOf("en")
+fun T(it: String, en: String) = if (lang == "it") it else en
+
 @Composable fun AmpedApp(c:AmpedMidiController,notice:String,onExport:()->Unit,onImport:()->Unit){
     val s by c.state.collectAsState()
     val presets by c.presets.collectAsState()
     var tab by remember {mutableIntStateOf(0)}
-    val titles=listOf("Amp","CabRig","Preset","USB")
+    val titles=listOf(T("Amp","Amp"),T("CabRig","CabRig"),T("Preset","Preset"),T("USB","USB"))
     Scaffold(
         containerColor = Coal,
         bottomBar = {
@@ -83,11 +86,14 @@ class MainActivity : ComponentActivity() {
         Column(Modifier.fillMaxSize().padding(padding)){
             Row(Modifier.fillMaxWidth().padding(horizontal=20.dp,vertical=14.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.SpaceBetween){
                 Column{Text("SURVEYOR",fontSize=25.sp,fontWeight=FontWeight.Black,letterSpacing=2.sp);Text("AMPED 3 CONTROLLER",fontSize=10.sp,letterSpacing=1.8.sp,color=Muted)}
-                Text(if(s.synced)"● LIVE" else if(s.connected)"● USB" else "○ USB",color=if(s.synced)Red else Muted,fontSize=12.sp,fontWeight=FontWeight.Bold)
+                Row(verticalAlignment=Alignment.CenterVertically) {
+                    TextButton(onClick={ lang = if(lang=="it") "en" else "it" }) { Text(lang.uppercase(), color=Red, fontWeight=FontWeight.Bold) }
+                    Text(if(s.synced)"● LIVE" else if(s.connected)"● USB" else "○ USB",color=if(s.synced)Red else Muted,fontSize=12.sp,fontWeight=FontWeight.Bold)
+                }
             }
             Row(Modifier.fillMaxWidth().background(Panel).padding(horizontal=16.dp,vertical=4.dp),verticalAlignment=Alignment.CenterVertically){
                 Text(s.status,Modifier.weight(1f),fontSize=12.sp,color=Muted)
-                TextButton(onClick={c.connectToAmp()},enabled=!s.busy){Text(if(s.connected)"Sincronizza" else "Connetti")}
+                TextButton(onClick={c.connectToAmp()},enabled=!s.busy){Text(if(s.connected)T("Sincronizza", "Sync") else T("Connetti", "Connect"))}
             }
             if(notice.isNotBlank())Text(notice,color=Red,fontSize=12.sp,modifier=Modifier.padding(16.dp))
             Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){
@@ -96,13 +102,13 @@ class MainActivity : ComponentActivity() {
                     1->CabPage(s,c)
                     2->PresetsPage(s,c,presets,onExport,onImport)
                     3->{
-                        Heading("Connessione","USB HID · AMPED 3")
-                        Text("Collega il telefono direttamente alla pedaliera con un cavo USB dati. Consenti l’accesso USB quando richiesto. I valori compaiono dopo la lettura della pedaliera.",color=Muted)
-                        Text("Backup automatico",fontWeight=FontWeight.Bold,modifier=Modifier.padding(top=16.dp))
-                        Text("I tre slot AMP e i tre slot CabRig vengono letti e salvati nel telefono. Esporta i backup per conservarli anche fuori dall’app.",color=Muted)
-                        OutlinedButton(onClick=onExport,modifier=Modifier.fillMaxWidth()){Text("Esporta libreria e backup")}
-                        Text("Diagnostica",fontWeight=FontWeight.Bold,modifier=Modifier.padding(top=12.dp))
-                        Text(s.logs.ifBlank {"In attesa del dispositivo USB."},fontSize=11.sp,color=Muted)
+                        Heading(T("Connessione", "Connection"),"USB HID · AMPED 3")
+                        Text(T("Collega il telefono direttamente alla pedaliera con un cavo USB dati. Consenti l’accesso USB quando richiesto. I valori compaiono dopo la lettura della pedaliera.", "Connect your phone directly to the pedal using a USB data cable. Allow USB access when prompted. Values will appear after the pedal is read."),color=Muted)
+                        Text(T("Backup automatico", "Auto Backup"),fontWeight=FontWeight.Bold,modifier=Modifier.padding(top=16.dp))
+                        Text(T("I tre slot AMP e i tre slot CabRig vengono letti e salvati nel telefono. Esporta i backup per conservarli anche fuori dall’app.", "The three AMP slots and three CabRig slots are read and saved to your phone. Export the backups to keep them outside the app."),color=Muted)
+                        OutlinedButton(onClick=onExport,modifier=Modifier.fillMaxWidth()){Text(T("Esporta libreria e backup", "Export Library & Backups"))}
+                        Text(T("Diagnostica", "Diagnostics"),fontWeight=FontWeight.Bold,modifier=Modifier.padding(top=12.dp))
+                        Text(s.logs.ifBlank {T("In attesa del dispositivo USB.", "Waiting for USB device.")},fontSize=11.sp,color=Muted)
                     }
                 }
                 Spacer(Modifier.height(20.dp))
@@ -113,35 +119,35 @@ class MainActivity : ComponentActivity() {
 @Composable private fun Heading(title:String,subtitle:String){Column(Modifier.padding(top=10.dp,bottom=14.dp)){Text(subtitle.uppercase(),fontSize=10.sp,color=Red,letterSpacing=1.6.sp);Text(title,fontSize=28.sp,fontWeight=FontWeight.Bold)}}
 @Composable private fun Section(title:String){HorizontalDivider(Modifier.padding(top=18.dp,bottom=12.dp),color=Panel);Text(title,fontSize=17.sp,fontWeight=FontWeight.SemiBold)}
 @Composable private fun AmpPage(s:AmpState,c:AmpedMidiController){
-    Heading(s.ampNames[s.ampSlot] ?: "Il tuo amplificatore",if(s.ampSlot>0)"Slot ${s.ampSlot} · impostazioni attuali" else "Impostazioni attuali")
+    Heading(s.ampNames[s.ampSlot] ?: T("Il tuo amplificatore", "Your Amplifier"),if(s.ampSlot>0)"Slot ${s.ampSlot} · impostazioni attuali" else T("Impostazioni attuali", "Current Settings"))
     Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
         listOf("Clean","Crunch","Overdrive").forEachIndexed {i,t->FilterChip(selected=s.ampSlot==i+1,onClick={c.recallAmp(i+1)},label={Text(t)},enabled=s.synced&&!s.busy)}
     }
-    if(!s.synced)Text("In attesa dei valori reali della pedaliera.",color=Muted,fontSize=13.sp)
+    if(!s.synced)Text(T("In attesa dei valori reali della pedaliera.", "Waiting for live values from the pedal."),color=Muted,fontSize=13.sp)
     listOf("Gain" to 0,"Volume preamp" to 1).forEach {(label,index)->Parameter(label,s.amp[index],127,s.synced&&!s.busy,{"%.1f".format(Locale.US,it*10f/127)}){c.setParameter(false,index,it)}}
-    Section("Equalizzazione")
+    Section(T("Equalizzazione", "Equalization"))
     listOf("Bass" to 4,"Middle" to 5,"Treble" to 6,"ISF" to 7,"Presence" to 8).forEach {(label,index)->Parameter(label,s.amp[index],127,s.synced&&!s.busy,{"%.1f".format(Locale.US,it*10f/127)}){c.setParameter(false,index,it)}}
-    Section("Carattere")
-    Choices("Risposta",s.amp[22],listOf("EL84" to 2,"EL34" to 3,"6L6" to 1),s.synced&&!s.busy){c.setParameter(false,22,it)}
-    Choices("Voce Clean",s.amp[26],listOf("Warm" to 1,"Bright" to 0),s.synced&&!s.busy){c.setParameter(false,26,it)}
-    Choices("Voce Crunch",s.amp[27],listOf("Crunch" to 1,"Super" to 0),s.synced&&!s.busy){c.setParameter(false,27,it)}
-    Choices("Voce Overdrive",s.amp[28],listOf("OD1" to 1,"OD2" to 0),s.synced&&!s.busy){c.setParameter(false,28,it)}
-    Section("Boost e riverbero")
+    Section(T("Carattere", "Character"))
+    Choices(T("Risposta", "Response"),s.amp[22],listOf("EL84" to 2,"EL34" to 3,"6L6" to 1),s.synced&&!s.busy){c.setParameter(false,22,it)}
+    Choices(T("Voce Clean", "Clean Voice"),s.amp[26],listOf("Warm" to 1,"Bright" to 0),s.synced&&!s.busy){c.setParameter(false,26,it)}
+    Choices(T("Voce Crunch", "Crunch Voice"),s.amp[27],listOf("Crunch" to 1,"Super" to 0),s.synced&&!s.busy){c.setParameter(false,27,it)}
+    Choices(T("Voce Overdrive", "Overdrive Voice"),s.amp[28],listOf("OD1" to 1,"OD2" to 0),s.synced&&!s.busy){c.setParameter(false,28,it)}
+    Section(T("Boost e riverbero", "Boost and Reverb"))
     Row(verticalAlignment = Alignment.CenterVertically) {
         Checkbox(checked = (s.amp.getOrNull(32) ?: 0) and 64 != 0, onCheckedChange = { c.setParameter(false, 32, (s.amp.getOrNull(32) ?: 0) xor 64) }, enabled = s.synced && !s.busy)
-        Text("Attiva Boost", modifier = Modifier.padding(start = 4.dp))
+        Text(T("Attiva Boost", "Enable Boost"), modifier = Modifier.padding(start = 4.dp))
     }
     Parameter("Boost",s.amp[2],127,s.synced&&!s.busy){c.setParameter(false,2,it)}
-    Choices("Posizione boost",s.amp[24],listOf("Pre" to 1,"Post" to 0),s.synced&&!s.busy){c.setParameter(false,24,it)}
+    Choices(T("Posizione boost", "Boost Position"),s.amp[24],listOf("Pre" to 1,"Post" to 0),s.synced&&!s.busy){c.setParameter(false,24,it)}
     Row(verticalAlignment = Alignment.CenterVertically) {
         Checkbox(checked = s.amp.getOrNull(33) == 1, onCheckedChange = { c.setParameter(false, 33, if (it) 1 else 0) }, enabled = s.synced && !s.busy)
-        Text("Attiva Riverbero", modifier = Modifier.padding(start = 4.dp))
+        Text(T("Attiva Riverbero", "Enable Reverb"), modifier = Modifier.padding(start = 4.dp))
     }
-    Parameter("Riverbero",s.amp[3],127,s.synced&&!s.busy){c.setParameter(false,3,it)}
-    Choices("Carattere riverbero",s.amp[25],listOf("Dark" to 1,"Light" to 0),s.synced&&!s.busy){c.setParameter(false,25,it)}
-    Section("Uscita")
+    Parameter(T("Riverbero", "Reverb"),s.amp[3],127,s.synced&&!s.busy){c.setParameter(false,3,it)}
+    Choices(T("Carattere riverbero", "Reverb Character"),s.amp[25],listOf("Dark" to 1,"Light" to 0),s.synced&&!s.busy){c.setParameter(false,25,it)}
+    Section(T("Uscita", "Output"))
     Parameter("Master",s.amp[9],127,s.synced&&!s.busy){c.setParameter(false,9,it)}
-    Section("Salvataggio Rapido")
+    Section(T("Salvataggio Rapido", "Quick Save"))
     var saveName by remember {mutableStateOf(s.ampNames[s.ampSlot] ?: "Mio Suono")}
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         OutlinedTextField(value=saveName,onValueChange={saveName=it.take(60)},label={Text("Nome")},singleLine=true,modifier=Modifier.weight(1f))
@@ -156,7 +162,7 @@ class MainActivity : ComponentActivity() {
     var mic by remember(s.cab[1]){mutableIntStateOf(if(s.cab[1] in 0..5) s.cab[1] else 0)}
     var axis by remember(s.cab[2]){mutableIntStateOf(if(s.cab[2]==1) 1 else 0)}
     Text("Profili estratti: 102. I filtri mancanti sono ignorati.",color=Muted,fontSize=12.sp)
-    Choices("Microfono",mic,listOf("57 Dynamic" to 0,"421 Dynamic" to 1,"67 Condenser" to 2,"414 Condenser" to 3,"121 Ribbon" to 4,"160 Ribbon" to 5),!s.busy){mic=it}
+    Choices(T("Microfono", "Microphone"),mic,listOf("57 Dynamic" to 0,"421 Dynamic" to 1,"67 Condenser" to 2,"414 Condenser" to 3,"121 Ribbon" to 4,"160 Ribbon" to 5),!s.busy){mic=it}
     Choices("Asse",axis,listOf("On Axis" to 0,"Off Axis" to 1),!s.busy){axis=it}
     Text("Attuale: ${listOf("57 Dyn","421 Dyn","67 Cond","414 Cond","121 Rib","160 Rib").getOrNull(s.cab[1])?:"—"} · ${if(s.cab[2]==0)"On Axis" else if(s.cab[2]==1)"Off Axis" else "—"}",color=Muted,fontSize=12.sp)
     Button(onClick={choosing=!choosing},enabled=s.synced&&!s.busy,modifier=Modifier.fillMaxWidth()){Text(if(choosing)"Chiudi scelta cassa" else "Scegli cassa e applica profilo")}
@@ -167,12 +173,12 @@ class MainActivity : ComponentActivity() {
         Checkbox(checked = s.cab.getOrNull(6) == 1, onCheckedChange = { c.setParameter(true, 6, if (it) 1 else 0) }, enabled = s.synced && !s.busy)
         Text("Mute", modifier = Modifier.padding(start = 4.dp))
     }
-    Section("Equalizzatore CabRig")
+    Section(T("Equalizzatore CabRig", "CabRig Equalizer"))
     var eqPreset by remember { mutableStateOf("") }
     var eqExpanded by remember { mutableStateOf(false) }
     Box(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
         OutlinedButton(onClick = { eqExpanded = true }, modifier = Modifier.fillMaxWidth(), enabled = s.synced && !s.busy) {
-            Text(if (eqPreset.isBlank()) "Scegli Preset EQ..." else "Preset EQ: $eqPreset")
+            Text(if (eqPreset.isBlank()) T("Scegli Preset EQ...", "Select EQ Preset...") else T("Preset EQ: $eqPreset", "EQ Preset: $eqPreset"))
         }
         DropdownMenu(expanded = eqExpanded, onDismissRequest = { eqExpanded = false }) {
             AmpedProtocol.eqPresets.keys.forEach { name ->
@@ -186,12 +192,12 @@ class MainActivity : ComponentActivity() {
     }
     Row(verticalAlignment = Alignment.CenterVertically) {
         Checkbox(checked = s.cab.getOrNull(74) == 1, onCheckedChange = { c.setParameter(true, 74, if (it) 1 else 0) }, enabled = s.synced && !s.busy)
-        Text("Bypass EQ", modifier = Modifier.padding(start = 4.dp))
+        Text(T("Bypass EQ", "Bypass EQ"), modifier = Modifier.padding(start = 4.dp))
     }
     listOf("Low" to 70,"Low mids" to 73,"High mids" to 77,"High" to 81).forEach {(label,index)->
         if (s.cab.getOrNull(74) != 1) Parameter(label,s.cab[index],255,s.synced&&!s.busy,{"%+.1f dB".format(Locale.US,(it-128)*10f/127)}){c.setParameter(true,index,it)}
     }
-    Section("Stanza (Room)")
+    Section(T("Stanza (Room)", "Room"))
     Row(verticalAlignment = Alignment.CenterVertically) {
         Checkbox(checked = s.cab.getOrNull(58) == 1, onCheckedChange = { c.setParameter(true, 58, if (it) 1 else 0) }, enabled = s.synced && !s.busy)
         Text("Solo", modifier = Modifier.padding(start = 4.dp, end = 16.dp))
@@ -199,7 +205,7 @@ class MainActivity : ComponentActivity() {
         Text("Mute", modifier = Modifier.padding(start = 4.dp))
     }
     Choices("Tipo di Stanza", s.cab.getOrNull(56) ?: 0, listOf("Small" to 0, "Small Damped" to 1, "Medium" to 2, "Medium Damped" to 3, "Large" to 4, "Large Damped" to 5), s.synced && !s.busy) { c.setParameter(true, 56, it) }
-    Choices("Ampiezza Stereo", s.cab.getOrNull(60) ?: 0, listOf("Mono" to 0, "Stereo" to 1, "Wide" to 2), s.synced && !s.busy) { c.setParameter(true, 60, it) }
+    Choices(T("Ampiezza Stereo", "Stereo Width"), s.cab.getOrNull(60) ?: 0, listOf("Mono" to 0, "Stereo" to 1, "Wide" to 2), s.synced && !s.busy) { c.setParameter(true, 60, it) }
     Parameter("Livello Room", s.cab.getOrNull(83) ?: 0, 255, s.synced && !s.busy) { c.setParameter(true, 83, it) }
     
     Section("Filtri (Cut)")
@@ -215,7 +221,7 @@ class MainActivity : ComponentActivity() {
     Section("Master CabRig")
     Parameter("Volume Globale", s.cab.getOrNull(65) ?: 0, 255, s.synced && !s.busy) { c.setParameter(true, 65, it) }
 
-    Section("Salvataggio Rapido")
+    Section(T("Salvataggio Rapido", "Quick Save"))
     var saveName by remember {mutableStateOf(s.cabNames[if (s.cabSlot > 0) s.cabSlot else 1] ?: "Mio CabRig")}
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         OutlinedTextField(value=saveName,onValueChange={saveName=it.take(60)},label={Text("Nome")},singleLine=true,modifier=Modifier.weight(1f))
@@ -255,7 +261,7 @@ class MainActivity : ComponentActivity() {
     for(i in 1..3)Text("CAB $i · ${s.cabNames[i]?:"Da leggere"}",color=Muted)
     
     Section("Backup e Ripristino")
-    Row(horizontalArrangement=Arrangement.spacedBy(12.dp)){OutlinedButton(onClick=onExport,modifier=Modifier.weight(1f)){Text("Esporta")};OutlinedButton(onClick=onImport,modifier=Modifier.weight(1f)){Text("Importa")}}
+    Row(horizontalArrangement=Arrangement.spacedBy(12.dp)){OutlinedButton(onClick=onExport,modifier=Modifier.weight(1f)){Text(T("Esporta", "Export"))};OutlinedButton(onClick=onImport,modifier=Modifier.weight(1f)){Text(T("Importa", "Import"))}}
 }
 @OptIn(ExperimentalLayoutApi::class)
 @Composable private fun Choices(label:String,value:Int,options:List<Pair<String,Int>>,enabled:Boolean,onSelect:(Int)->Unit){
