@@ -132,9 +132,14 @@ slots were untouched throughout.
 One limit is worth stating precisely. A slot stores the cabinet, microphone and axis indices, and
 those are the template's, so reading the slot back cannot distinguish "our coefficient table was
 stored" from "only the indices were stored and the factory table was reloaded at boot". The
-protocol has no command that reads coefficients back; Architect only ever writes them. What
-settles it is listening, and the owner reported the slot sounding as expected after the power
-cycle. That is a report, not a measurement, and it is recorded here as such.
+protocol has no command that reads coefficients back; Architect only ever writes them.
+
+Listening settles it. After the power cycle the owner heard a clear difference in that slot and
+preferred the cabinet that had been there before, which is the point: the sound had changed and
+stayed changed across a power cycle, so it was the fitted table playing and not the factory one
+reloaded from the indices. It also says something about the fit, that a cabinet approximated from
+an impulse response is not automatically better than the one the manufacturer measured. The slot
+was then restored from the backup and read back byte for byte, along with the other five.
 
 ## Measuring the response: the USB route does not work
 
