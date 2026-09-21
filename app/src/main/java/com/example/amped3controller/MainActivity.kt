@@ -60,14 +60,14 @@ class MainActivity : ComponentActivity() {
     private var notice by mutableStateOf("")
     private val export=registerForActivityResult(ActivityResultContracts.CreateDocument("application/json")){ uri ->
         if(uri!=null) runCatching {contentResolver.openOutputStream(uri)!!.bufferedWriter().use {it.write(controller.exportData())}}
-            .onSuccess {notice="Libreria e backup esportati"}.onFailure {notice="Esportazione fallita: ${it.message}"}
+            .onSuccess {notice=T("Libreria e backup esportati", "Library and backups exported")}.onFailure {notice=T("Esportazione fallita: ${it.message}", "Export failed: ${it.message}")}
     }
     private val import=registerForActivityResult(ActivityResultContracts.OpenDocument()){uri ->
         if(uri!=null) notice=runCatching {contentResolver.openInputStream(uri)!!.bufferedReader().use {reader ->
             val chars=CharArray(2_000_001);var count=0
             while(count<chars.size){val n=reader.read(chars,count,chars.size-count);if(n<0)break;count+=n}
             controller.importData(String(chars,0,count))
-        }}.getOrElse {"File non leggibile: ${it.message}"}
+        }}.getOrElse {T("File non leggibile: ${it.message}", "Cannot read that file: ${it.message}")}
     }
     private val importIr=registerForActivityResult(ActivityResultContracts.OpenDocument()){uri ->
         if(uri!=null) runCatching {
@@ -79,7 +79,7 @@ class MainActivity : ComponentActivity() {
             }
             val name=uri.lastPathSegment?.substringAfterLast('/')?.take(80) ?: "impulse.wav"
             controller.convertIr(bytes,name)
-        }.onFailure { notice=it.message ?: "Import fallito" }
+        }.onFailure { notice=it.message ?: T("Import fallito", "Import failed") }
     }
     override fun onCreate(savedInstanceState:Bundle?){
         super.onCreate(savedInstanceState);enableEdgeToEdge()
@@ -96,7 +96,7 @@ class MainActivity : ComponentActivity() {
         if (debug) intent?.getStringExtra("ir")?.let { path ->
             runCatching { java.io.File(path).readBytes() }
                 .onSuccess { controller.convertIr(it, java.io.File(path).name) }
-                .onFailure { notice = "IR non leggibile: ${it.message}" }
+                .onFailure { notice = T("IR non leggibile: ${it.message}", "Cannot read that IR: ${it.message}") }
         }
     }
     override fun onDestroy(){controller.close();super.onDestroy()}
@@ -120,7 +120,7 @@ fun T(it: String, en: String) = if (lang == "it") it else en
     Box(Modifier.fillMaxSize().background(Coal).alpha(uscita.value), contentAlignment=Alignment.Center) {
         Column(horizontalAlignment=Alignment.CenterHorizontally) {
             Image(
-                painter = painterResource(R.drawable.blackstar_logo),
+                painter = painterResource(R.drawable.surveyor_logo),
                 contentDescription = "Surveyor",
                 modifier = Modifier.height(54.dp).alpha((a*2.2f).coerceAtMost(1f)).scale(0.96f + 0.04f*a),
                 contentScale = ContentScale.Fit
@@ -164,7 +164,7 @@ fun T(it: String, en: String) = if (lang == "it") it else en
             Box(Modifier.fillMaxWidth().height(90.dp)) {
                 Image(painter = painterResource(R.drawable.tolex_header), contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
                 Row(Modifier.fillMaxSize().padding(horizontal=20.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.SpaceBetween){
-                    Image(painter = painterResource(R.drawable.blackstar_logo), contentDescription = "Blackstar", modifier = Modifier.height(40.dp), contentScale = ContentScale.Fit)
+                    Image(painter = painterResource(R.drawable.surveyor_logo), contentDescription = "Blackstar", modifier = Modifier.height(40.dp), contentScale = ContentScale.Fit)
                     Column(horizontalAlignment = Alignment.End) {
                         if (s.synced || s.connected) {
                             Text(s.ampNames[s.ampSlot]?.uppercase() ?: "CH ${s.ampSlot}", color=Color.White, fontSize=16.sp, fontWeight=FontWeight.Black, letterSpacing=1.sp)
@@ -439,6 +439,9 @@ fun T(it: String, en: String) = if (lang == "it") it else en
             }
         }
     }
+    Text(T("Il file: WAV, qualunque frequenza di campionamento (non serve ricampionare), PCM a 8/16/24/32 bit o float a 32. Di un file a piu' canali viene usato il primo. Deve essere la risposta all'impulso di una cassa: se ne usano i primi 170 ms, perche' sedici filtri non possono rendere una coda di riverbero.",
+           "The file: WAV, any sample rate (no resampling needed), 8/16/24/32-bit PCM or 32-bit float. From a multi-channel file the first channel is used. It has to be a cabinet impulse response: the first 170 ms are used, because sixteen filters cannot render a reverb tail."),
+        color=Muted,fontSize=12.sp,modifier=Modifier.padding(top=8.dp,bottom=10.dp))
     OutlinedButton(onClick=onImportIr,enabled=!s.busy,modifier=Modifier.fillMaxWidth()) {
         Text(T("Converti un file WAV", "Convert a WAV file"))
     }
@@ -449,6 +452,14 @@ fun T(it: String, en: String) = if (lang == "it") it else en
             Text(T("Scostamento dalla risposta d'origine: %.2f dB".format(Locale.US,k.errorDb),
                    "Deviation from the source response: %.2f dB".format(Locale.US,k.errorDb)),color=Muted,fontSize=12.sp)
             Text(T("Banco di poli: ${k.templateKey}", "Pole bank: ${k.templateKey}"),color=Muted,fontSize=12.sp)
+            Text(
+                T("%.0f Hz · %s · %d ms usati%s".format(Locale.US, k.rate,
+                    if (k.channels > 1) "primo di ${k.channels} canali" else "mono", k.usedMs,
+                    if (k.truncated) " (file troncato)" else ""),
+                  "%.0f Hz · %s · %d ms used%s".format(Locale.US, k.rate,
+                    if (k.channels > 1) "first of ${k.channels} channels" else "mono", k.usedMs,
+                    if (k.truncated) " (file truncated)" else "")),
+                color=Muted,fontSize=12.sp)
             if (k.attenuatedDb < -0.05) Text(
                 T("Attenuato di %.1f dB per rientrare nei limiti".format(Locale.US,k.attenuatedDb),
                   "Attenuated by %.1f dB to stay within limits".format(Locale.US,k.attenuatedDb)),color=Muted,fontSize=12.sp)
@@ -604,17 +615,17 @@ fun T(it: String, en: String) = if (lang == "it") it else en
         else if (saveDest in 1..3) c.saveAmpHardware(saveDest, name)
         else if (saveDest in 4..6) c.saveCabHardware(saveDest - 3, name)
         name=""
-    },enabled=s.synced&&!s.busy&&name.isNotBlank(),modifier=Modifier.fillMaxWidth(),colors=ButtonDefaults.buttonColors(containerColor=Red,contentColor=Color.White)){Text(if (saveDest==0) "Salva impostazioni sul telefono" else "Brucia nella memoria della pedaliera",color=Color.White)}
+    },enabled=s.synced&&!s.busy&&name.isNotBlank(),modifier=Modifier.fillMaxWidth(),colors=ButtonDefaults.buttonColors(containerColor=Red,contentColor=Color.White)){Text(if (saveDest==0) T("Salva sul telefono", "Save to the phone") else T("Scrivi nella memoria della pedaliera", "Write to the pedal memory"),color=Color.White)}
     
     if(presets.isEmpty())Text(T("La libreria locale è vuota.", "Your library is empty."),Modifier.padding(vertical=20.dp),color=Muted)
     presets.forEach {p->
         Row(Modifier.fillMaxWidth().padding(vertical=10.dp),verticalAlignment=Alignment.CenterVertically){Column(Modifier.weight(1f)){Text(p.name,fontWeight=FontWeight.Bold);Text(AmpedProtocol.cabinetNames.getOrNull(p.cab[0])?:"CabRig",fontSize=12.sp,color=Muted)};OutlinedButton(onClick={c.applyLocal(p)},enabled=s.synced&&!s.busy){Text(T("Carica", "Load"))}}
     }
-    Section("Memorie della pedaliera")
-    for(i in 1..3)Text("AMP $i · ${s.ampNames[i]?:"Da leggere"}",color=Muted)
-    for(i in 1..3)Text("CAB $i · ${s.cabNames[i]?:"Da leggere"}",color=Muted)
+    Section(T("Memorie della pedaliera", "Pedal memories"))
+    for(i in 1..3)Text("AMP $i · ${s.ampNames[i] ?: T("da leggere", "not read yet")}",color=Muted)
+    for(i in 1..3)Text("CAB $i · ${s.cabNames[i] ?: T("da leggere", "not read yet")}",color=Muted)
     
-    Section("Backup e Ripristino")
+    Section(T("Backup e ripristino", "Backup and restore"))
     Row(horizontalArrangement=Arrangement.spacedBy(12.dp)){OutlinedButton(onClick=onExport,modifier=Modifier.weight(1f)){Text(T("Esporta", "Export"))};OutlinedButton(onClick=onImport,modifier=Modifier.weight(1f)){Text(T("Importa", "Import"))}}
 }
 @Composable private fun Choices(label:String,value:Int,options:List<Pair<String,Int>>,enabled:Boolean,onSelect:(Int)->Unit){

@@ -11,8 +11,9 @@ import kotlin.math.min
 import kotlin.math.sin
 import kotlin.math.sqrt
 
-/** A mono impulse response and the rate it was recorded at. */
-class Audio(val rate: Double, val samples: DoubleArray)
+/** One channel of an impulse response, the rate it was recorded at, and how many channels the
+ *  file had, so the app can say it took the first one rather than quietly discarding the rest. */
+class Audio(val rate: Double, val samples: DoubleArray, val channels: Int = 1)
 
 /** Minimal WAV reader: PCM 8/16/24/32 bit integer and 32 bit float, first channel only. */
 object Wav {
@@ -55,7 +56,7 @@ object Wav {
             }
             if (!out[i].isFinite()) return null
         }
-        return Audio(rate.toDouble(), out)
+        return Audio(rate.toDouble(), out, channels)
     }
     private fun str(b: ByteArray, at: Int, n: Int) = String(b, at, n, Charsets.US_ASCII)
     private fun le16(b: ByteArray, at: Int) = (b[at].toInt() and 255) or ((b[at + 1].toInt() and 255) shl 8)

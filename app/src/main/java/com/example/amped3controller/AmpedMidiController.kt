@@ -53,6 +53,7 @@ class AmpedMidiController(private val context: Context) {
         val header: String, val chunks: List<String>, val templateKey: String,
         val templateHeader: String, val templateChunks: List<String>,
         val cab: Int, val mic: Int, val axis: Int, val source: String,
+        val rate: Double, val channels: Int, val usedMs: Int, val truncated: Boolean,
         val errorDb: Double, val attenuatedDb: Double,
         val verdict: com.example.amped3controller.dsp.SafetyCheck.Verdict
     )
@@ -418,6 +419,8 @@ class AmpedMidiController(private val context: Context) {
                     json.getString("header"),
                     (0 until json.getJSONArray("chunks").length()).map { json.getJSONArray("chunks").getString(it) },
                     json.getInt("cab"), json.getInt("mic"), json.getInt("axis"), source,
+                    audio.rate, audio.channels,
+                    (prepared.size * 1000.0 / audio.rate).toInt(), prepared.size < audio.samples.size,
                     fitted.errorDb, fitted.attenuatedDb, fitted.verdict)
             }
             outcome.onSuccess { c ->
