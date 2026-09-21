@@ -437,12 +437,27 @@ class AmpedMidiController(private val context: Context) {
 
     fun discardConversion() { conversionMutable.value = null }
 
+    /**
+     * Re-runs the checks on the bytes that are about to leave, rather than trusting a flag written
+     * when the profile was made. A stored verdict says what was true of some earlier version of
+     * the code; this says what is true of these coefficients now.
+     */
+    private fun refuses(custom: CustomProfile): Boolean {
+        val values = com.example.amped3controller.dsp.CabProfile.decode(custom.header, custom.chunks)
+        val verdict = if (values == null) null else com.example.amped3controller.dsp.SafetyCheck.verify(values)
+        if (verdict != null && verdict.passed) return false
+        val reason = verdict?.summary ?: T("profilo illeggibile", "unreadable profile")
+        mutable.update { it.copy(busy = false, status =
+            T("Non inviato, i controlli lo rifiutano: $reason", "Not sent, the checks refuse it: $reason")) }
+        return true
+    }
+
     fun saveConversion(name: String) {
         val c = conversionMutable.value ?: return
         if (name.isBlank()) return
         val entry = CustomProfile(System.currentTimeMillis().toString(), name.trim().take(60),
             System.currentTimeMillis(), c.source, c.templateKey, c.cab, c.mic, c.axis,
-            c.header, c.chunks, c.errorDb, c.attenuatedDb)
+            c.header, c.chunks, c.errorDb, c.attenuatedDb, c.verdict.passed)
         val list = customMutable.value + entry
         runCatching {
             val temp = File(customFile.parentFile, "custom.tmp")
@@ -471,6 +486,7 @@ class AmpedMidiController(private val context: Context) {
     fun audition(custom: CustomProfile) {
         val s = state.value
         if (!s.synced || s.busy) return
+        if (refuses(custom)) return
         val back = profile(s.cab[0], s.cab[1], s.cab[2]) ?: run {
             mutable.update { it.copy(status = T("Cassa attuale non riconosciuta: non ho una via di ritorno", "Current cabinet unknown: no way back, refusing")) }
             return
@@ -504,6 +520,90 @@ class AmpedMidiController(private val context: Context) {
                 auditionFile.delete()
                 mutable.update { it.copy(customLoaded = false, customName = "") }
             }.onFailure { e -> mutable.update { it.copy(busy = false, status = e.message ?: "") } }
+        }
+    }
+
+    /**
+     * Writes a converted profile into one of the three CabRig slots, so it survives the pedal
+     * being switched off. The live state is loaded first and the slot is saved from it, which is
+     * how the hardware works: 0xAF stores whatever the DSP is running.
+     *
+     * The destination slot is read and persisted before anything is overwritten, the save is
+     * confirmed by its acknowledgement, and the slot is read back and compared against the state
+     * that was meant to be stored. Anything less and the old cabinet would be gone with no way to
+     * tell whether the new one arrived.
+     */
+    fun writeCustomToSlot(custom: CustomProfile, slot: Int, name: String) {
+        val s = state.value
+        if (!s.synced || s.busy || slot !in 1..3) return
+        if (refuses(custom)) return
+        val encodedName = try { AmpedProtocol.saveNamePacket(true, slot, name) } catch (e: IllegalArgumentException) {
+            mutable.update { it.copy(status = e.message ?: T("Nome non valido", "Invalid name")) }; return
+        }
+        val back = profile(s.cab[0], s.cab[1], s.cab[2])
+        mutable.update { it.copy(busy = true, status = T("Scrittura nel banco $slot…", "Writing to slot $slot…")) }
+        commands.offer {
+            try {
+                // una via di ritorno anche se l'app muore a meta' scrittura
+                if (back != null) auditionFile.writeText(JSONObject()
+                    .put("amp", JSONArray(s.amp)).put("cab", JSONArray(s.cab))
+                    .put("factory", back).put("level", s.cab.getOrElse(AmpedProtocol.CAB_CABINET_LEVEL) { 64 })
+                    .put("name", custom.name).put("at", System.currentTimeMillis()).toString())
+                val previous = readStored(true, slot)
+                val backup = JSONObject().put("kind", "cab").put("slot", slot)
+                    .put("stored", JSONObject(previous as Map<*, *>))
+                    .put("liveAmp", JSONArray(s.amp)).put("liveCab", JSONArray(s.cab))
+                    .put("replacedBy", custom.name).put("source", custom.source)
+                val file = File(context.filesDir, "backup-before-save-${System.nanoTime()}.json")
+                java.io.FileOutputStream(file).use { stream ->
+                    stream.write(backup.toString(2).toByteArray(Charsets.UTF_8)); stream.fd.sync()
+                }
+                check(JSONObject(file.readText()).getJSONObject("stored").length() == previous.size)
+                log("Backup del banco $slot: ${file.name}")
+
+                // carica i coefficienti, servendo i chunk che la pedaliera chiede
+                write(AmpedProtocol.parameter(true, 0, custom.cab))
+                write(AmpedProtocol.parameter(true, 1, custom.mic))
+                write(AmpedProtocol.parameter(true, 2, custom.axis))
+                write(AmpedProtocol.decodeHex(custom.header))
+                var finito = false
+                val fine = System.currentTimeMillis() + 6000
+                while (!finito && System.currentTimeMillis() < fine) {
+                    val r = readReport() ?: continue
+                    when (r[0].toInt() and 255) {
+                        0xab -> {
+                            val i = r[1].toInt() and 255
+                            check(i < custom.chunks.size) { "Indice DSP non valido: $i" }
+                            write(AmpedProtocol.decodeHex(custom.chunks[i]))
+                        }
+                        0xad -> finito = true
+                        else -> receive(r)
+                    }
+                }
+                check(finito) { T("Il trasferimento del profilo non e' stato confermato", "The profile transfer was not acknowledged") }
+
+                write(AmpedProtocol.packet(0xaf, slot - 1, 0, 0))
+                write(encodedName)
+                awaitReport { (it[0].toInt() and 255) == 0xaf && (it[1].toInt() and 255) == slot - 1 }
+                var verified = false
+                val scadenza = System.currentTimeMillis() + 4000
+                while (!verified && System.currentTimeMillis() < scadenza) {
+                    val actual = readStored(true, slot)
+                    val storedName = actual.entries.first { it.key.startsWith("4:") }.value
+                    val readName = AmpedProtocol.decodeHex(storedName).takeWhile { it != 0.toByte() }
+                        .toByteArray().toString(Charsets.US_ASCII)
+                    verified = readName == name
+                }
+                check(verified) { T("Il banco riletto non coincide: conserva il backup e non ripetere", "The slot read back does not match: keep the backup and do not repeat") }
+                auditionFile.delete()
+                log("Banco $slot scritto con \"$name\" e riletto")
+                mutable.update { it.copy(cabNames = it.cabNames + (slot to name), customLoaded = false, customName = "") }
+                startSync()
+            } catch (e: Exception) {
+                log("Scrittura non confermata: ${e.message}")
+                mutable.update { it.copy(busy = false, synced = false,
+                    status = T("Scrittura non confermata: ${e.message}", "Write not confirmed: ${e.message}")) }
+            }
         }
     }
 
