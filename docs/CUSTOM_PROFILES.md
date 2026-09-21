@@ -123,6 +123,19 @@ stored slots were byte-identical to the backup afterwards.
 This makes a power cycle a guaranteed recovery path: whatever a custom profile does to the sound,
 switching the pedal off puts the stored cabinet back.
 
+Writing one into a slot was then tested on the same unit. The destination slot was read and
+persisted first, the profile was loaded into the live DSP, `0xAF` stored it, the acknowledgement
+arrived and the slot read back with the new name and the expected parameters. After switching the
+pedal off and on the slot still carried that name, and the pedal booted from it. The other two
+slots were untouched throughout.
+
+One limit is worth stating precisely. A slot stores the cabinet, microphone and axis indices, and
+those are the template's, so reading the slot back cannot distinguish "our coefficient table was
+stored" from "only the indices were stored and the factory table was reloaded at boot". The
+protocol has no command that reads coefficients back; Architect only ever writes them. What
+settles it is listening, and the owner reported the slot sounding as expected after the power
+cycle. That is a report, not a measurement, and it is recorded here as such.
+
 ## Measuring the response: the USB route does not work
 
 The AMPED 3 presents itself as a 4-in 4-out USB audio device at 48 kHz, which at least confirms the
