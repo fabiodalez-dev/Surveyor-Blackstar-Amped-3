@@ -22,7 +22,8 @@ object AmpedProtocol {
      *  levels whose meaning is verified. The Master level is deliberately excluded, like the
      *  amplifier's Master: loading a preset should not change how loud the rig is. */
     val cabPresetOffsets = cabEqBands + listOf(
-        CAB_CABINET_LEVEL, CAB_ROOM_LEVEL, CAB_LOW_CUT_ON, CAB_LOW_CUT_FREQ, CAB_HIGH_CUT_ON, CAB_HIGH_CUT_FREQ)
+        CAB_CABINET_LEVEL, CAB_ROOM_LEVEL, CAB_LOW_CUT_ON, CAB_LOW_CUT_FREQ, CAB_HIGH_CUT_ON, CAB_HIGH_CUT_FREQ,
+        5, 6, 56, 58, 59, 60, 74)
     /* AMP offsets 0..9 verified the same day by correlating the live block with the values
        Architect displayed for each knob; every knob matched exactly one offset. */
     /** Cabinet and Room level bytes as decibels. Calibrated on 2026-09-21 by stepping the

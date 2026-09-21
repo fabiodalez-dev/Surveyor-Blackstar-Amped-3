@@ -1,26 +1,29 @@
 package com.example.amped3controller.ui.main
 
-import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
-import androidx.compose.ui.test.onNodeWithText
-import org.junit.Before
+import androidx.compose.ui.test.*
+import androidx.lifecycle.ViewModelProvider
+import com.example.amped3controller.MainActivity
+import com.example.amped3controller.ControllerModel
 import org.junit.Rule
 import org.junit.Test
+import org.junit.Assert.assertSame
 
-/** UI tests for [com.example.amped3controller.ui.main.MainScreen]. */
 class MainScreenTest {
+    @get:Rule val rule = createAndroidComposeRule<MainActivity>()
 
-  @get:Rule val composeTestRule = createAndroidComposeRule<ComponentActivity>()
+    @Test fun cabinetCanBeSelectedOfflineWithoutEnablingUpload() {
+        rule.onNodeWithText("CabRig").performClick()
+        rule.onNodeWithTag("cabinet-selector").performScrollTo().assertIsEnabled().performClick()
+        rule.onNodeWithText("1x10 Classic USA Combo").performClick()
+        rule.onNodeWithTag("cabinet-selector").assertTextContains("1x10 Classic USA Combo")
+        rule.onNodeWithTag("apply-cabinet").performScrollTo().assertIsNotEnabled()
+    }
 
-  @Before
-  fun setup() {
-    composeTestRule.setContent { MainScreen(FAKE_DATA) }
-  }
-
-  @Test
-  fun firstItem_exists() {
-    FAKE_DATA.forEach { composeTestRule.onNodeWithText("Hello $it!").assertExists() }
-  }
+    @Test fun controllerSurvivesActivityRecreation() {
+        lateinit var before: ControllerModel
+        rule.activityRule.scenario.onActivity { before = ViewModelProvider(it)[ControllerModel::class.java] }
+        rule.activityRule.scenario.recreate()
+        rule.activityRule.scenario.onActivity { assertSame(before, ViewModelProvider(it)[ControllerModel::class.java]) }
+    }
 }
-
-private val FAKE_DATA = listOf("Sample1", "Sample2", "Sample3")
