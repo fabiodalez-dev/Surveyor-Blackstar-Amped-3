@@ -40,9 +40,24 @@ class AmpedMidiController(private val context: Context) {
     private var dspDeadline = 0L
     private var syncDeadline = 0L
     private val savedReports = linkedMapOf<String, String>()
+    private val customFile = File(context.filesDir, "custom_profiles.json")
+    private val auditionFile = File(context.filesDir, "audition.json")
     private val presetsFile = File(context.filesDir, "presets.json")
     private val presetsMutable = MutableStateFlow(readPresets())
     val presets = presetsMutable.asStateFlow()
+    private val customMutable = MutableStateFlow(readCustom())
+    val customProfiles = customMutable.asStateFlow()
+
+    /** A fitted candidate waiting for the user to decide: audition it, save it, or drop it. */
+    class Conversion(
+        val header: String, val chunks: List<String>, val templateKey: String,
+        val templateHeader: String, val templateChunks: List<String>,
+        val cab: Int, val mic: Int, val axis: Int, val source: String,
+        val errorDb: Double, val attenuatedDb: Double,
+        val verdict: com.example.amped3controller.dsp.SafetyCheck.Verdict
+    )
+    private val conversionMutable = MutableStateFlow<Conversion?>(null)
+    val conversion = conversionMutable.asStateFlow()
     private var registered = true
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(c: Context, intent: Intent) {
@@ -59,6 +74,12 @@ class AmpedMidiController(private val context: Context) {
         }
     }
     init {
+        // a profile left in the live DSP by a previous run must still be revertible after a
+        // restart, which is the whole point of writing the snapshot to disk before sending
+        if (auditionFile.exists()) {
+            val name = runCatching { JSONObject(auditionFile.readText()).optString("name") }.getOrDefault("")
+            mutable.update { it.copy(customLoaded = true, customName = name) }
+        }
         val filter = IntentFilter(permissionAction).apply {
             addAction(UsbManager.ACTION_USB_DEVICE_ATTACHED)
             addAction(UsbManager.ACTION_USB_DEVICE_DETACHED)
@@ -355,6 +376,136 @@ class AmpedMidiController(private val context: Context) {
                 logs = it.logs)
         }
     }
+
+    // --- impulse response conversion -----------------------------------------------------
+
+    private fun readCustom(): List<CustomProfile> = runCatching {
+        if (!customFile.exists()) emptyList() else CustomProfile.parseList(customFile.readText())
+    }.getOrDefault(emptyList())
+
+    /**
+     * Fits a WAV impulse response onto the pole bank of the cabinet currently loaded, so the
+     * denominators, and with them the stability, are the pedal's own. The result is held as a
+     * pending conversion and is never sent anywhere until the user asks.
+     */
+    fun convertIr(bytes: ByteArray, source: String) {
+        if (state.value.busy) return
+        mutable.update { it.copy(busy = true, status = T("Conversione della risposta…", "Converting the impulse response…")) }
+        // pure arithmetic, no USB: it must not queue behind hardware commands, and it has to work
+        // with no pedal attached so the result can be inspected before anything is sent
+        Thread {
+            val outcome = runCatching {
+                val audio = com.example.amped3controller.dsp.Wav.decode(bytes)
+                    ?: error(T("File WAV non leggibile", "Cannot read that WAV file"))
+                val prepared = com.example.amped3controller.dsp.Fit.prepare(audio)
+                if (prepared.size < 64) error(T("La risposta e' troppo corta o silenziosa", "That impulse response is too short or silent"))
+                val s = state.value
+                // the three profiles that quantise onto the unit circle are shipped data, not a
+                // licence to generate more of the same, so they are never used as a template
+                val marginal = setOf("7:5:0", "22:5:0", "22:5:1")
+                var key = "${s.cab[0]}:${s.cab[1]}:${s.cab[2]}"
+                var json = profile(s.cab[0], s.cab[1], s.cab[2])
+                if (json == null || key in marginal) { json = profile(21, 5, 0); key = "21:5:0" }
+                val template = com.example.amped3controller.dsp.CabProfile.decode(
+                    json!!.getString("header"),
+                    (0 until json.getJSONArray("chunks").length()).map { json.getJSONArray("chunks").getString(it) }
+                ) ?: error(T("Profilo di riferimento non leggibile", "Cannot read the reference profile"))
+                val fitted = com.example.amped3controller.dsp.Fit.fit(
+                    template, com.example.amped3controller.dsp.Fit.minimumPhase(prepared), audio.rate)
+                val encoded = com.example.amped3controller.dsp.CabProfile.encode(json.getString("header"), fitted.values)
+                    ?: error(T("Codifica fallita", "Encoding failed"))
+                Conversion(encoded.first, encoded.second, key,
+                    json.getString("header"),
+                    (0 until json.getJSONArray("chunks").length()).map { json.getJSONArray("chunks").getString(it) },
+                    json.getInt("cab"), json.getInt("mic"), json.getInt("axis"), source,
+                    fitted.errorDb, fitted.attenuatedDb, fitted.verdict)
+            }
+            outcome.onSuccess { c ->
+                conversionMutable.value = c
+                mutable.update { it.copy(busy = false, status =
+                    if (c.verdict.passed) T("Conversione pronta", "Conversion ready")
+                    else T("Conversione rifiutata dai controlli", "Conversion refused by the checks")) }
+            }.onFailure { e ->
+                conversionMutable.value = null
+                mutable.update { it.copy(busy = false, status = e.message ?: T("Conversione fallita", "Conversion failed")) }
+            }
+        }.also { it.isDaemon = true; it.start() }
+    }
+
+    fun discardConversion() { conversionMutable.value = null }
+
+    fun saveConversion(name: String) {
+        val c = conversionMutable.value ?: return
+        if (name.isBlank()) return
+        val entry = CustomProfile(System.currentTimeMillis().toString(), name.trim().take(60),
+            System.currentTimeMillis(), c.source, c.templateKey, c.cab, c.mic, c.axis,
+            c.header, c.chunks, c.errorDb, c.attenuatedDb)
+        val list = customMutable.value + entry
+        runCatching {
+            val temp = File(customFile.parentFile, "custom.tmp")
+            temp.writeText(org.json.JSONArray(list.map { it.json() }).toString())
+            check(temp.renameTo(customFile))
+            customMutable.value = list
+        }.onFailure { e -> mutable.update { it.copy(status = e.message ?: "") } }
+    }
+
+    fun deleteCustom(id: String) {
+        val list = customMutable.value.filterNot { it.id == id }
+        runCatching {
+            val temp = File(customFile.parentFile, "custom.tmp")
+            temp.writeText(org.json.JSONArray(list.map { it.json() }).toString())
+            check(temp.renameTo(customFile))
+            customMutable.value = list
+        }
+    }
+
+    /**
+     * Loads a profile into the live DSP for listening. Before anything goes out, the current live
+     * state and the factory payload for the cabinet in use are written to disk, so a crash in the
+     * middle still leaves a way back; then the cabinet level is dropped to its minimum, because
+     * the first time you hear something new it should not be at gig volume.
+     */
+    fun audition(custom: CustomProfile) {
+        val s = state.value
+        if (!s.synced || s.busy) return
+        val back = profile(s.cab[0], s.cab[1], s.cab[2]) ?: run {
+            mutable.update { it.copy(status = T("Cassa attuale non riconosciuta: non ho una via di ritorno", "Current cabinet unknown: no way back, refusing")) }
+            return
+        }
+        mutable.update { it.copy(busy = true, status = T("Prova del profilo…", "Auditioning the profile…")) }
+        commands.offer {
+            runCatching {
+                auditionFile.writeText(JSONObject()
+                    .put("amp", JSONArray(s.amp)).put("cab", JSONArray(s.cab))
+                    .put("factory", back).put("level", s.cab.getOrElse(AmpedProtocol.CAB_CABINET_LEVEL) { 64 })
+                    .put("name", custom.name).put("at", System.currentTimeMillis()).toString())
+                write(AmpedProtocol.parameter(true, AmpedProtocol.CAB_CABINET_LEVEL, 0))
+                transfer(custom.transferJson())
+            }.onFailure { e -> mutable.update { it.copy(busy = false, status = e.message ?: "") } }
+        }
+        mutable.update { it.copy(customLoaded = true, customName = custom.name) }
+    }
+
+    /** Puts the factory cabinet and the original level back, and only then forgets the audition. */
+    fun revertAudition() {
+        val saved = runCatching { JSONObject(auditionFile.readText()) }.getOrNull() ?: run {
+            mutable.update { it.copy(customLoaded = false, customName = "") }
+            return
+        }
+        if (state.value.busy) return
+        mutable.update { it.copy(busy = true, status = T("Ripristino della cassa di fabbrica…", "Restoring the factory cabinet…")) }
+        commands.offer {
+            runCatching {
+                write(AmpedProtocol.parameter(true, AmpedProtocol.CAB_CABINET_LEVEL, saved.getInt("level")))
+                transfer(saved.getJSONObject("factory"))
+                auditionFile.delete()
+                mutable.update { it.copy(customLoaded = false, customName = "") }
+            }.onFailure { e -> mutable.update { it.copy(busy = false, status = e.message ?: "") } }
+        }
+    }
+
+    /** True when a previous session left a custom profile in the live DSP. */
+    fun auditionOutstanding() = auditionFile.exists()
 
     fun exportData(): String = JSONObject().put("format","amped-usb-library-v1")
         .put("presets", JSONArray(presetsMutable.value.map { it.json() }))

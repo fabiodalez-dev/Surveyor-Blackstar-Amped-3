@@ -165,5 +165,7 @@ data class AmpState(
     val cabSlot: Int = 0,
     val ampNames: Map<Int, String> = emptyMap(),
     val cabNames: Map<Int, String> = emptyMap(),
-    val logs: String = ""
+    val logs: String = "",
+    val customLoaded: Boolean = false,
+    val customName: String = ""
 )
