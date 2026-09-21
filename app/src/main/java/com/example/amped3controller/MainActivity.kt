@@ -1,6 +1,11 @@
 package com.example.amped3controller
 
 import android.os.Bundle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.ViewModelProvider
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -45,6 +50,7 @@ import androidx.compose.ui.graphics.Brush
 
 
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import java.util.Locale
@@ -59,47 +65,53 @@ class MainActivity : ComponentActivity() {
     private lateinit var controller:AmpedMidiController
     private var notice by mutableStateOf("")
     private val export=registerForActivityResult(ActivityResultContracts.CreateDocument("application/json")){ uri ->
-        if(uri!=null) runCatching {contentResolver.openOutputStream(uri)!!.bufferedWriter().use {it.write(controller.exportData())}}
-            .onSuccess {notice=T("Libreria e backup esportati", "Library and backups exported")}.onFailure {notice=T("Esportazione fallita: ${it.message}", "Export failed: ${it.message}")}
+        if(uri!=null) lifecycleScope.launch {
+            notice = runCatching { withContext(Dispatchers.IO) {
+                contentResolver.openOutputStream(uri)!!.bufferedWriter().use { it.write(controller.exportData()) }
+            }; T("Libreria e backup esportati", "Library and backups exported") }
+                .getOrElse { "Export: ${it.message}" }
+        }
     }
     private val import=registerForActivityResult(ActivityResultContracts.OpenDocument()){uri ->
-        if(uri!=null) notice=runCatching {contentResolver.openInputStream(uri)!!.bufferedReader().use {reader ->
-            val chars=CharArray(2_000_001);var count=0
-            while(count<chars.size){val n=reader.read(chars,count,chars.size-count);if(n<0)break;count+=n}
-            controller.importData(String(chars,0,count))
-        }}.getOrElse {T("File non leggibile: ${it.message}", "Cannot read that file: ${it.message}")}
+        if(uri!=null) lifecycleScope.launch {
+            notice=runCatching { withContext(Dispatchers.IO) {
+                val data = contentResolver.openInputStream(uri)!!.use { Recovery.readLimited(it, 32_000_000) }
+                controller.importData(data.toString(Charsets.UTF_8))
+            }}.getOrElse { "Import: ${it.message}" }
+        }
     }
     private val importIr=registerForActivityResult(ActivityResultContracts.OpenDocument()){uri ->
-        if(uri!=null) runCatching {
-            val bytes=contentResolver.openInputStream(uri)!!.use { stream ->
-                val limit=16*1024*1024
-                val data=stream.readBytes()
-                require(data.size<=limit) {"File troppo grande"}
-                data
-            }
-            val name=uri.lastPathSegment?.substringAfterLast('/')?.take(80) ?: "impulse.wav"
-            controller.convertIr(bytes,name)
-        }.onFailure { notice=it.message ?: T("Import fallito", "Import failed") }
+        if(uri!=null) lifecycleScope.launch {
+            runCatching {
+                val bytes = withContext(Dispatchers.IO) {
+                    contentResolver.openInputStream(uri)!!.use { Recovery.readLimited(it, 16*1024*1024) }
+                }
+                val name=uri.lastPathSegment?.substringAfterLast('/')?.take(80) ?: "impulse.wav"
+                controller.convertIr(bytes,name)
+            }.onFailure { notice=it.message ?: "Import failed" }
+        }
     }
     override fun onCreate(savedInstanceState:Bundle?){
         super.onCreate(savedInstanceState);enableEdgeToEdge()
-        controller=AmpedMidiController(applicationContext)
+        controller=ViewModelProvider(this)[ControllerModel::class.java].controller
         setContent {
             MaterialTheme(colorScheme=darkColorScheme(primary=Red,onPrimary=Coal,background=Coal,surface=Coal,surfaceVariant=Panel,onSurface=Paper,onSurfaceVariant=Muted,secondary=Red)) {
                 AmpedApp(controller,notice,{export.launch("Amped3-preset-e-backup.json")},{import.launch(arrayOf("application/json","text/plain","text/xml","application/xml","*/*"))},{importIr.launch(arrayOf("audio/wav","audio/x-wav","application/octet-stream","*/*"))})
             }
         }
         val debug = (applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0
-        if (debug && intent?.getBooleanExtra("demo", false) == true) controller.enableDemo() else controller.connectToAmp()
+        if (savedInstanceState == null) {
+            if (debug && intent?.getBooleanExtra("demo", false) == true) controller.enableDemo() else controller.connectToAmp()
+        }
         // debug-only hook so the conversion path can be exercised without driving the file picker:
         //   adb shell am start ... --ez demo true --es ir /sdcard/Download/some.wav
-        if (debug) intent?.getStringExtra("ir")?.let { path ->
-            runCatching { java.io.File(path).readBytes() }
+        if (debug && savedInstanceState == null) intent?.getStringExtra("ir")?.let { path ->
+            runCatching { java.io.File(path).inputStream().use { Recovery.readLimited(it, 16*1024*1024) } }
                 .onSuccess { controller.convertIr(it, java.io.File(path).name) }
                 .onFailure { notice = T("IR non leggibile: ${it.message}", "Cannot read that IR: ${it.message}") }
         }
     }
-    override fun onDestroy(){controller.close();super.onDestroy()}
+
 }
 
 var lang by mutableStateOf("en")
@@ -292,7 +304,7 @@ fun T(it: String, en: String) = if (lang == "it") it else en
     Section(T("Uscita", "Output"))
     Box(Modifier.fillMaxWidth(), contentAlignment=Alignment.Center) { Parameter("Master",s.amp[9],127,s.synced&&!s.busy){c.setParameter(false,9,it)} }
     Section(T("Salvataggio Rapido", "Quick Save"))
-    var saveName by remember {mutableStateOf(s.ampNames[s.ampSlot] ?: "Mio Suono")}
+    var saveName by remember(s.ampSlot,s.ampNames[s.ampSlot]) {mutableStateOf(s.ampNames[s.ampSlot] ?: "Mio Suono")}
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         OutlinedTextField(value=saveName,onValueChange={saveName=it.take(60)},label={Text(T("Nome", "Name"))},singleLine=true,modifier=Modifier.weight(1f))
         Button(onClick={c.saveAmpHardware(if (s.ampSlot > 0) s.ampSlot else 1, saveName)},enabled=s.synced&&!s.busy&&saveName.isNotBlank(),colors=ButtonDefaults.buttonColors(containerColor=Red,contentColor=Color.White)){Text(T("Salva su Slot ", "Save to slot ") + "${if (s.ampSlot > 0) s.ampSlot else 1}",color=Color.White)}
@@ -329,7 +341,7 @@ fun T(it: String, en: String) = if (lang == "it") it else en
     Text(T("Libreria DSP completa · 24 casse × 6 microfoni × 2 assi", "Complete DSP library · 24 cabinets × 6 mics × 2 axes"),color=Muted,fontSize=12.sp)
     Text(T("Cassa", "Cabinet").uppercase(), color=Muted, fontSize=12.sp, fontWeight=FontWeight.Bold, letterSpacing=1.4.sp)
     Box(modifier = Modifier.fillMaxWidth()) {
-        OutlinedButton(onClick={cabinetExpanded=true}, enabled=!s.busy, modifier=Modifier.fillMaxWidth()) {
+        OutlinedButton(onClick={cabinetExpanded=true}, enabled=!s.busy, modifier=Modifier.fillMaxWidth().testTag("cabinet-selector")) {
             Text(AmpedProtocol.cabinetNames[cabinet])
         }
         DropdownMenu(expanded=cabinetExpanded,onDismissRequest={cabinetExpanded=false}) {
@@ -342,7 +354,7 @@ fun T(it: String, en: String) = if (lang == "it") it else en
     Choices(T("Asse", "Axis"),axis,listOf("On Axis" to 0,"Off Axis" to 1),!s.busy){axis=it}
     Text(T("Selezionato: ", "Selected: ") + "${AmpedProtocol.cabinetNames[cabinet]} · ${listOf("57 Dyn","421 Dyn","67 Cond","414 Cond","121 Rib","160 Rib")[mic]} · ${if(axis==0)"On Axis" else "Off Axis"}",color=Muted,fontSize=12.sp)
     Text(T("Caricato: ", "Loaded: ") + "$name · ${listOf("57 Dyn","421 Dyn","67 Cond","414 Cond","121 Rib","160 Rib").getOrNull(s.cab[1])?:"—"} · ${if(s.cab[2]==0)"On Axis" else if(s.cab[2]==1)"Off Axis" else "—"}",color=Muted,fontSize=12.sp)
-    Button(onClick={c.chooseCab(cabinet,mic,axis)},enabled=s.synced&&!s.busy,modifier=Modifier.fillMaxWidth()){Text(T("Applica profilo DSP", "Load DSP profile"))}
+    Button(onClick={c.chooseCab(cabinet,mic,axis)},enabled=s.synced&&!s.busy,modifier=Modifier.fillMaxWidth().testTag("apply-cabinet")){Text(T("Applica profilo DSP", "Load DSP profile"))}
     if (!s.synced) Text(T("Collega AMPED 3 via USB OTG e premi Connetti per applicare il profilo scelto.", "Connect the AMPED 3 over USB OTG and tap Connect to load the chosen profile."), color=Muted, fontSize=12.sp)
     Row(verticalAlignment = Alignment.CenterVertically) {
         Checkbox(checked = s.cab.getOrNull(5) == 1, onCheckedChange = { c.setParameter(true, 5, if (it) 1 else 0) }, enabled = s.synced && !s.busy)
@@ -401,7 +413,7 @@ fun T(it: String, en: String) = if (lang == "it") it else en
     Box(Modifier.fillMaxWidth(), contentAlignment=Alignment.Center) { Parameter(T("Volume Globale", "Master Level"), s.cab.getOrNull(AmpedProtocol.CAB_MASTER_LEVEL) ?: 0, 255, s.synced && !s.busy) { c.setParameter(true, AmpedProtocol.CAB_MASTER_LEVEL, it) } }
 
     Section(T("Salvataggio Rapido", "Quick Save"))
-    var saveName by remember {mutableStateOf(s.cabNames[if (s.cabSlot > 0) s.cabSlot else 1] ?: "Mio CabRig")}
+    var saveName by remember(s.cabSlot,s.cabNames[s.cabSlot]) {mutableStateOf(s.cabNames[if (s.cabSlot > 0) s.cabSlot else 1] ?: "Mio CabRig")}
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         OutlinedTextField(value=saveName,onValueChange={saveName=it.take(60)},label={Text(T("Nome", "Name"))},singleLine=true,modifier=Modifier.weight(1f))
         Button(onClick={c.saveCabHardware(if (s.cabSlot > 0) s.cabSlot else 1, saveName)},enabled=s.synced&&!s.busy&&saveName.isNotBlank(),colors=ButtonDefaults.buttonColors(containerColor=Red,contentColor=Color.White)){Text(T("Salva su Cab ", "Save to cab ") + "${if (s.cabSlot > 0) s.cabSlot else 1}",color=Color.White)}
@@ -431,10 +443,10 @@ fun T(it: String, en: String) = if (lang == "it") it else en
         Box(Modifier.fillMaxWidth().padding(vertical=10.dp).background(Color(0xFF3A1512),RoundedCornerShape(10.dp)).padding(14.dp)) {
             Column {
                 Text(T("In prova: ${s.customName}", "Auditioning: ${s.customName}"),color=Paper,fontWeight=FontWeight.Black)
-                Text(T("Livello cassa al minimo. La cassa di fabbrica e' salvata e torna con un tocco.",
-                       "Cabinet level at minimum. The factory cabinet is saved and one tap brings it back."),color=Muted,fontSize=12.sp)
-                Button(onClick={c.revertAudition()},enabled=!s.busy,modifier=Modifier.fillMaxWidth().padding(top=10.dp)) {
-                    Text(T("Ripristina la cassa di fabbrica", "Restore the factory cabinet"))
+                Text(T("Snapshot di recupero disponibile. Ripristina il profilo precedente dopo la connessione USB.",
+                       "Recovery snapshot available. Restore the previous profile after connecting USB."),color=Muted,fontSize=12.sp)
+                Button(onClick={c.revertAudition()},enabled=s.synced&&!s.busy,modifier=Modifier.fillMaxWidth().padding(top=10.dp)) {
+                    Text(T("Ripristina il profilo precedente", "Restore the previous profile"))
                 }
             }
         }
@@ -484,6 +496,8 @@ fun T(it: String, en: String) = if (lang == "it") it else en
             }
         }
     }
+    var confirmingCustom by remember { mutableStateOf<CustomProfile?>(null) }
+    var existingSlot by remember { mutableIntStateOf(1) }
     var scrivendo by remember { mutableStateOf<String?>(null) }
     var slot by remember { mutableIntStateOf(1) }
     var nomeBanco by remember { mutableStateOf("") }
@@ -505,6 +519,9 @@ fun T(it: String, en: String) = if (lang == "it") it else en
                     slot = if (s.cabSlot in 1..3) s.cabSlot else 1
                 },enabled=s.synced&&!s.busy){ Text(T("Nel banco…", "To a slot…")) }
                 TextButton(onClick={c.deleteCustom(profile.id)}){Text(T("Elimina", "Delete"),color=Muted)}
+            }
+            TextButton(onClick={confirmingCustom=profile;existingSlot=if(s.cabSlot in 1..3) s.cabSlot else 1},enabled=s.synced&&!s.busy) {
+                Text(T("Questo custom è già in un banco…", "This custom is already in a slot…"))
             }
             if (scrivendo == profile.id) {
                 Column(Modifier.fillMaxWidth().padding(top=8.dp)
@@ -546,6 +563,15 @@ fun T(it: String, en: String) = if (lang == "it") it else en
                 }
             }
         }
+    }
+    confirmingCustom?.let { p ->
+        AlertDialog(onDismissRequest={confirmingCustom=null}, title={Text(p.name)},
+            text={Column {
+                Text(T("Associa solo se questo è esattamente il custom già salvato nel banco: la pedaliera restituisce gli indici, non i coefficienti. Verrà creato un backup locale senza scritture USB.", "Associate only if this is the exact custom already stored in the slot: the pedal returns indices, not coefficients. This creates a local backup without USB writes."))
+                Choices("CAB",existingSlot,listOf("1" to 1,"2" to 2,"3" to 3),true){existingSlot=it}
+            }},
+            confirmButton={TextButton(onClick={c.confirmCustomSlot(p,existingSlot);confirmingCustom=null}){Text(T("Confermo identità", "Confirm identity"))}},
+            dismissButton={TextButton(onClick={confirmingCustom=null}){Text(T("Annulla", "Cancel"))}})
     }
 }
 
@@ -678,6 +704,27 @@ fun T(it: String, en: String) = if (lang == "it") it else en
     for(i in 1..3)Text("AMP $i · ${s.ampNames[i] ?: T("da leggere", "not read yet")}",color=Muted)
     for(i in 1..3)Text("CAB $i · ${s.cabNames[i] ?: T("da leggere", "not read yet")}",color=Muted)
     
+    val recoveries by c.recoveries.collectAsState()
+    if (recoveries.isNotEmpty()) {
+        Section(T("Recuperi CabRig disponibili", "Available CabRig recoveries"))
+        Text(T("Carica il suono in memoria attiva, senza sovrascrivere banchi. Master e potenza restano invariati.", "Load the sound into live memory without overwriting slots. Master and power stay unchanged."),color=Muted,fontSize=12.sp)
+        recoveries.forEach { p ->
+            Text(p.name,color=Muted,fontSize=12.sp)
+            OutlinedButton(onClick={c.applyLocal(p)},enabled=s.synced&&!s.busy){Text(T("Carica recupero live", "Load live recovery"))}
+        }
+    }
+    Section(T("Backup dei banchi CabRig", "CabRig slot backups"))
+    Text(T("Per un banco con una cassa originale Blackstar, conferma qui sotto: salveremo parametri e profilo DSP. Non usarlo per una IR custom: gli indici da soli non la identificano.",
+        "For a slot containing a stock Blackstar cabinet, confirm below to back up parameters and DSP. Do not use this for custom IRs: selector indices cannot identify them."),color=Muted,fontSize=12.sp)
+    var confirming by remember { mutableIntStateOf(0) }
+    Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+        (1..3).forEach { slot -> OutlinedButton(onClick={confirming=slot},enabled=s.synced&&!s.busy,modifier=Modifier.weight(1f)){Text("CAB $slot")} }
+    }
+    if(confirming != 0) AlertDialog(onDismissRequest={confirming=0},
+        title={Text("CAB $confirming · ${s.cabNames[confirming] ?: ""}")},
+        text={Text(T("Confermi che questo banco contiene una cassa originale e non coefficienti custom? Leggeremo il banco e salveremo la copia in locale, senza sovrascriverlo.", "Does this slot contain a stock cabinet, not custom coefficients? This reads the slot and saves a local backup without overwriting it."))},
+        confirmButton={TextButton(onClick={c.confirmFactorySlot(confirming);confirming=0}){Text(T("Confermo cassa originale", "Confirm stock cabinet"))}},
+        dismissButton={TextButton(onClick={confirming=0}){Text(T("Annulla", "Cancel"))}})
     Section(T("Backup e ripristino", "Backup and restore"))
     Row(horizontalArrangement=Arrangement.spacedBy(12.dp)){OutlinedButton(onClick=onExport,modifier=Modifier.weight(1f)){Text(T("Esporta", "Export"))};OutlinedButton(onClick=onImport,modifier=Modifier.weight(1f)){Text(T("Importa", "Import"))}}
 }

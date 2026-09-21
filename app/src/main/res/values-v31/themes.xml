@@ -1,11 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Fondo carbone anche prima di Android 12, dove l'apertura mostra solo windowBackground.
-         Lo splash chiaro stonava con un'app pensata per una sala prove al buio. -->
     <style name="Theme.Amped3Controller" parent="android:Theme.Material.NoActionBar">
         <item name="android:windowBackground">@color/coal</item>
         <item name="android:colorBackground">@color/coal</item>
         <item name="android:statusBarColor">@color/coal</item>
         <item name="android:navigationBarColor">@color/coal</item>
+        <item name="android:windowSplashScreenBackground">@color/coal</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/splash_logo</item>
+        <item name="android:windowSplashScreenIconBackgroundColor">@color/coal</item>
     </style>
 </resources>
