@@ -69,16 +69,35 @@ class MainActivity : ComponentActivity() {
             controller.importData(String(chars,0,count))
         }}.getOrElse {"File non leggibile: ${it.message}"}
     }
+    private val importIr=registerForActivityResult(ActivityResultContracts.OpenDocument()){uri ->
+        if(uri!=null) runCatching {
+            val bytes=contentResolver.openInputStream(uri)!!.use { stream ->
+                val limit=16*1024*1024
+                val data=stream.readBytes()
+                require(data.size<=limit) {"File troppo grande"}
+                data
+            }
+            val name=uri.lastPathSegment?.substringAfterLast('/')?.take(80) ?: "impulse.wav"
+            controller.convertIr(bytes,name)
+        }.onFailure { notice=it.message ?: "Import fallito" }
+    }
     override fun onCreate(savedInstanceState:Bundle?){
         super.onCreate(savedInstanceState);enableEdgeToEdge()
         controller=AmpedMidiController(applicationContext)
         setContent {
             MaterialTheme(colorScheme=darkColorScheme(primary=Red,onPrimary=Coal,background=Coal,surface=Coal,surfaceVariant=Panel,onSurface=Paper,onSurfaceVariant=Muted,secondary=Red)) {
-                AmpedApp(controller,notice,{export.launch("Amped3-preset-e-backup.json")},{import.launch(arrayOf("application/json","text/plain","text/xml","application/xml","*/*"))})
+                AmpedApp(controller,notice,{export.launch("Amped3-preset-e-backup.json")},{import.launch(arrayOf("application/json","text/plain","text/xml","application/xml","*/*"))},{importIr.launch(arrayOf("audio/wav","audio/x-wav","application/octet-stream","*/*"))})
             }
         }
         val debug = (applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0
         if (debug && intent?.getBooleanExtra("demo", false) == true) controller.enableDemo() else controller.connectToAmp()
+        // debug-only hook so the conversion path can be exercised without driving the file picker:
+        //   adb shell am start ... --ez demo true --es ir /sdcard/Download/some.wav
+        if (debug) intent?.getStringExtra("ir")?.let { path ->
+            runCatching { java.io.File(path).readBytes() }
+                .onSuccess { controller.convertIr(it, java.io.File(path).name) }
+                .onFailure { notice = "IR non leggibile: ${it.message}" }
+        }
     }
     override fun onDestroy(){controller.close();super.onDestroy()}
 }
@@ -119,7 +138,7 @@ fun T(it: String, en: String) = if (lang == "it") it else en
     }
 }
 
-@Composable fun AmpedApp(c:AmpedMidiController,notice:String,onExport:()->Unit,onImport:()->Unit){
+@Composable fun AmpedApp(c:AmpedMidiController,notice:String,onExport:()->Unit,onImport:()->Unit,onImportIr:()->Unit){
     val s by c.state.collectAsState()
     val presets by c.presets.collectAsState()
     var tab by remember {mutableIntStateOf(0)}
@@ -162,7 +181,7 @@ fun T(it: String, en: String) = if (lang == "it") it else en
             Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){
                 when(tab){
                     0->AmpPage(s,c)
-                    1->CabPage(s,c)
+                    1->CabPage(s,c,onImportIr)
                     2->PresetsPage(s,c,presets,onExport,onImport)
                     3->{
                         Heading(T("Impostazioni", "Settings"),T("Sistema e diagnostica", "System and Diagnostics"))
@@ -279,7 +298,7 @@ fun T(it: String, en: String) = if (lang == "it") it else en
         Button(onClick={c.saveAmpHardware(if (s.ampSlot > 0) s.ampSlot else 1, saveName)},enabled=s.synced&&!s.busy&&saveName.isNotBlank(),colors=ButtonDefaults.buttonColors(containerColor=Red,contentColor=Color.White)){Text(T("Salva su Slot ", "Save to slot ") + "${if (s.ampSlot > 0) s.ampSlot else 1}",color=Color.White)}
     }
 }
-@Composable private fun CabPage(s:AmpState,c:AmpedMidiController){
+@Composable private fun CabPage(s:AmpState,c:AmpedMidiController,onImportIr:()->Unit={}){
     val name=AmpedProtocol.cabinetNames.getOrNull(s.cab[0])?:"CabRig"
     Heading(name,if(s.cabSlot>0)"CabRig · slot ${s.cabSlot}" else "CabRig")
     Column(verticalArrangement=Arrangement.spacedBy(8.dp), modifier=Modifier.fillMaxWidth().padding(bottom=12.dp)){
@@ -389,6 +408,137 @@ fun T(it: String, en: String) = if (lang == "it") it else en
     }
 
     Text(T("Le modifiche sono immediate.", "Changes take effect immediately."),color=Muted,fontSize=12.sp)
+    CustomProfileSection(s,c,onImportIr)
+}
+
+/**
+ * Converting an impulse response into a cabinet profile, and listening to it safely.
+ *
+ * Loading coefficients only writes the live DSP, never the stored slots, and the fit keeps the
+ * pole bank of a factory cabinet, so a converted profile is as stable as one Blackstar ships.
+ * What is not guaranteed is how it sounds, which is why nothing is sent until the checks pass and
+ * why the first listen happens with the cabinet level at its minimum.
+ */
+@Composable private fun CustomProfileSection(s:AmpState,c:AmpedMidiController,onImportIr:()->Unit){
+    val conversion by c.conversion.collectAsState()
+    val saved by c.customProfiles.collectAsState()
+    var name by remember { mutableStateOf("") }
+    Section(T("Profili da risposta all'impulso", "Profiles from an impulse response"))
+    Text(T("Sperimentale. La conversione tiene i poli della cassa caricata, quindi la stabilita' e' quella di un profilo di fabbrica. Il suono invece non e' garantito: nulla viene inviato se i controlli non passano.",
+           "Experimental. The fit keeps the poles of the loaded cabinet, so stability is that of a factory profile. The sound is not guaranteed: nothing is sent unless the checks pass."),
+        color=Muted,fontSize=12.sp)
+    if (s.customLoaded) {
+        Box(Modifier.fillMaxWidth().padding(vertical=10.dp).background(Color(0xFF3A1512),RoundedCornerShape(10.dp)).padding(14.dp)) {
+            Column {
+                Text(T("In prova: ${s.customName}", "Auditioning: ${s.customName}"),color=Paper,fontWeight=FontWeight.Black)
+                Text(T("Livello cassa al minimo. La cassa di fabbrica e' salvata e torna con un tocco.",
+                       "Cabinet level at minimum. The factory cabinet is saved and one tap brings it back."),color=Muted,fontSize=12.sp)
+                Button(onClick={c.revertAudition()},enabled=!s.busy,modifier=Modifier.fillMaxWidth().padding(top=10.dp)) {
+                    Text(T("Ripristina la cassa di fabbrica", "Restore the factory cabinet"))
+                }
+            }
+        }
+    }
+    OutlinedButton(onClick=onImportIr,enabled=!s.busy,modifier=Modifier.fillMaxWidth()) {
+        Text(T("Converti un file WAV", "Convert a WAV file"))
+    }
+    conversion?.let { k ->
+        val metrics = k.verdict.metrics
+        Column(Modifier.fillMaxWidth().padding(top=12.dp).background(Panel,RoundedCornerShape(10.dp)).padding(14.dp)) {
+            Text(k.source,color=Paper,fontWeight=FontWeight.Bold,fontSize=14.sp)
+            Text(T("Scostamento dalla risposta d'origine: %.2f dB".format(Locale.US,k.errorDb),
+                   "Deviation from the source response: %.2f dB".format(Locale.US,k.errorDb)),color=Muted,fontSize=12.sp)
+            Text(T("Banco di poli: ${k.templateKey}", "Pole bank: ${k.templateKey}"),color=Muted,fontSize=12.sp)
+            if (k.attenuatedDb < -0.05) Text(
+                T("Attenuato di %.1f dB per rientrare nei limiti".format(Locale.US,k.attenuatedDb),
+                  "Attenuated by %.1f dB to stay within limits".format(Locale.US,k.attenuatedDb)),color=Muted,fontSize=12.sp)
+            Text(if (k.verdict.passed) T("Controlli superati", "Checks passed") else k.verdict.summary,
+                color=if (k.verdict.passed) Color(0xFF7BD88F) else Red,fontSize=13.sp,fontWeight=FontWeight.Bold,
+                modifier=Modifier.padding(top=6.dp))
+            metrics?.let {
+                Text(T("picco %.1f dB · 20 Hz %.0f dB · coda %.0f ms".format(Locale.US,it.peakDb,it.hz20Db,it.t60*1000),
+                       "peak %.1f dB · 20 Hz %.0f dB · tail %.0f ms".format(Locale.US,it.peakDb,it.hz20Db,it.t60*1000)),
+                    color=Muted,fontSize=11.sp)
+            }
+            ResponseCurve(k.header,k.chunks,k.templateHeader,k.templateChunks)
+            OutlinedTextField(value=name,onValueChange={name=it.take(60)},label={Text(T("Nome", "Name"))},
+                singleLine=true,modifier=Modifier.fillMaxWidth().padding(top=8.dp))
+            Row(Modifier.fillMaxWidth().padding(top=8.dp),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick={c.saveConversion(name);name=""},enabled=name.isNotBlank(),modifier=Modifier.weight(1f)) {
+                    Text(T("Salva", "Save"))
+                }
+                OutlinedButton(onClick={c.discardConversion()},modifier=Modifier.weight(1f)) {
+                    Text(T("Scarta", "Discard"))
+                }
+            }
+        }
+    }
+    saved.forEach { profile ->
+        Row(Modifier.fillMaxWidth().padding(top=8.dp),verticalAlignment=Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(profile.name,color=Paper,fontWeight=FontWeight.Bold)
+                Text("${profile.source} · %.2f dB".format(Locale.US,profile.errorDb),color=Muted,fontSize=11.sp)
+            }
+            TextButton(onClick={c.audition(profile)},enabled=s.synced&&!s.busy){Text(T("Prova", "Audition"))}
+            TextButton(onClick={c.deleteCustom(profile.id)}){Text(T("Elimina", "Delete"),color=Muted)}
+        }
+    }
+}
+
+/**
+ * The converted profile in red over the cabinet it was fitted on in grey, 40 Hz to 16 kHz on a log
+ * axis. It is the modelled response, from the coefficients: no sweep has ever been measured at the
+ * pedal's output, so read it as what the maths says, not as what the speaker does.
+ */
+@Composable private fun ResponseCurve(header:String,chunks:List<String>,baseHeader:String?,baseChunks:List<String>?){
+    val values = remember(header) { com.example.amped3controller.dsp.CabProfile.decode(header,chunks) }
+    val base = remember(baseHeader) {
+        if (baseHeader != null && baseChunks != null) com.example.amped3controller.dsp.CabProfile.decode(baseHeader,baseChunks) else null
+    }
+    if (values == null) return
+    val points = 200
+    val lo = kotlin.math.ln(40.0); val hi = kotlin.math.ln(16000.0)
+    fun curve(v: FloatArray) = DoubleArray(points) { i ->
+        val hz = kotlin.math.exp(lo + (hi - lo) * i / (points - 1.0))
+        com.example.amped3controller.dsp.CabProfile.db(
+            com.example.amped3controller.dsp.CabProfile.magnitudeAtHz(v, hz))
+    }
+    val db = curve(values)
+    val dbBase = base?.let { curve(it) }
+    Column(Modifier.fillMaxWidth().padding(top=12.dp)) {
+        Canvas(Modifier.fillMaxWidth().height(130.dp)) {
+            val top = (maxOf(db.max(), dbBase?.max() ?: -99.0) + 4).coerceAtLeast(6.0)
+            val bottom = top - 48
+            fun y(v: Double) = (size.height * (top - v) / (top - bottom)).toFloat().coerceIn(0f, size.height)
+            for (g in 1..3) {
+                val yy = size.height * g / 4f
+                drawLine(Color(0xFF2A2A2D), Offset(0f, yy), Offset(size.width, yy), 1.dp.toPx())
+            }
+            // decade marks at 100 Hz, 1 kHz, 10 kHz so the eye has somewhere to stand
+            listOf(100.0, 1000.0, 10000.0).forEach { hz ->
+                val x = (size.width * (kotlin.math.ln(hz) - lo) / (hi - lo)).toFloat()
+                drawLine(Color(0xFF2A2A2D), Offset(x, 0f), Offset(x, size.height), 1.dp.toPx())
+            }
+            fun trace(data: DoubleArray, colour: Color, width: Float) {
+                var previous = Offset(0f, y(data[0]))
+                for (i in 1 until points) {
+                    val point = Offset(size.width * i / (points - 1f), y(data[i]))
+                    drawLine(colour, previous, point, width, StrokeCap.Round)
+                    previous = point
+                }
+            }
+            dbBase?.let { trace(it, Color(0xFF6E6A67), 1.5.dp.toPx()) }
+            trace(db, Red, 2.dp.toPx())
+        }
+        Row(Modifier.fillMaxWidth().padding(top=4.dp),horizontalArrangement=Arrangement.SpaceBetween) {
+            Text("40 Hz",color=Muted,fontSize=10.sp)
+            Text("100 Hz · 1 kHz · 10 kHz",color=Color(0xFF3A3A3D),fontSize=10.sp)
+            Text("16 kHz",color=Muted,fontSize=10.sp)
+        }
+        Text(T("rosso: convertito · grigio: cassa di partenza · risposta modellata, non misurata",
+               "red: converted · grey: source cabinet · modelled response, not measured"),
+            color=Muted,fontSize=10.sp,modifier=Modifier.padding(top=2.dp))
+    }
 }
 /** Silhouette della cassa scelta. Coni e pollici si leggono dal nome ("4x12 Classic UK"),
  *  cosi' una 2x12 non viene disegnata come una 4x12. La voce DI non ha cassa: si disegna la presa. */
