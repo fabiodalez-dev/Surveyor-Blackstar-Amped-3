@@ -22,7 +22,9 @@ data class CustomProfile(
     val header: String,
     val chunks: List<String>,
     val errorDb: Double,
-    val attenuatedDb: Double
+    val attenuatedDb: Double,
+    /** Whether it passed the checks when it was made. A profile that did not is never sent. */
+    val passed: Boolean = true
 ) {
     /** The shape the DSP transfer expects, identical to a factory profile's. */
     fun transferJson(): JSONObject = JSONObject()
@@ -32,6 +34,7 @@ data class CustomProfile(
     fun json(): JSONObject = transferJson()
         .put("id", id).put("name", name).put("created", created).put("source", source)
         .put("templateKey", templateKey).put("errorDb", errorDb).put("attenuatedDb", attenuatedDb)
+        .put("passed", passed)
 
     companion object {
         fun parseList(text: String): List<CustomProfile> {
@@ -47,7 +50,8 @@ data class CustomProfile(
                     o.optString("templateKey").take(20),
                     o.getInt("cab"), o.getInt("mic"), o.getInt("axis"),
                     o.getString("header"), (0 until 5).map { chunks.getString(it) },
-                    o.optDouble("errorDb", Double.NaN), o.optDouble("attenuatedDb", 0.0)
+                    o.optDouble("errorDb", Double.NaN), o.optDouble("attenuatedDb", 0.0),
+                    o.optBoolean("passed", false)
                 )
             }
         }

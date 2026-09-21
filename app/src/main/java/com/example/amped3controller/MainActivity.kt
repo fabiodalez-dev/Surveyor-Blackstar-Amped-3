@@ -475,7 +475,7 @@ fun T(it: String, en: String) = if (lang == "it") it else en
             OutlinedTextField(value=name,onValueChange={name=it.take(60)},label={Text(T("Nome", "Name"))},
                 singleLine=true,modifier=Modifier.fillMaxWidth().padding(top=8.dp))
             Row(Modifier.fillMaxWidth().padding(top=8.dp),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick={c.saveConversion(name);name=""},enabled=name.isNotBlank(),modifier=Modifier.weight(1f)) {
+                OutlinedButton(onClick={c.saveConversion(name);name=""},enabled=name.isNotBlank()&&k.verdict.passed,modifier=Modifier.weight(1f)) {
                     Text(T("Salva", "Save"))
                 }
                 OutlinedButton(onClick={c.discardConversion()},modifier=Modifier.weight(1f)) {
@@ -484,14 +484,67 @@ fun T(it: String, en: String) = if (lang == "it") it else en
             }
         }
     }
+    var scrivendo by remember { mutableStateOf<String?>(null) }
+    var slot by remember { mutableIntStateOf(1) }
+    var nomeBanco by remember { mutableStateOf("") }
     saved.forEach { profile ->
-        Row(Modifier.fillMaxWidth().padding(top=8.dp),verticalAlignment=Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text(profile.name,color=Paper,fontWeight=FontWeight.Bold)
-                Text("${profile.source} · %.2f dB".format(Locale.US,profile.errorDb),color=Muted,fontSize=11.sp)
+        Column(Modifier.fillMaxWidth().padding(top=10.dp)) {
+            Row(verticalAlignment=Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(profile.name,color=Paper,fontWeight=FontWeight.Bold)
+                    Text("${profile.source} · %.2f dB".format(Locale.US,profile.errorDb) +
+                        (if (!profile.passed) T(" · da riverificare", " · will be re-checked") else ""),
+                        color=Muted,fontSize=11.sp)
+                }
+                TextButton(onClick={c.audition(profile)},enabled=s.synced&&!s.busy){
+                    Text(T("Prova", "Try"))
+                }
+                TextButton(onClick={
+                    scrivendo = if (scrivendo == profile.id) null else profile.id
+                    nomeBanco = profile.name.take(21)
+                    slot = if (s.cabSlot in 1..3) s.cabSlot else 1
+                },enabled=s.synced&&!s.busy){ Text(T("Nel banco…", "To a slot…")) }
+                TextButton(onClick={c.deleteCustom(profile.id)}){Text(T("Elimina", "Delete"),color=Muted)}
             }
-            TextButton(onClick={c.audition(profile)},enabled=s.synced&&!s.busy){Text(T("Prova", "Audition"))}
-            TextButton(onClick={c.deleteCustom(profile.id)}){Text(T("Elimina", "Delete"),color=Muted)}
+            if (scrivendo == profile.id) {
+                Column(Modifier.fillMaxWidth().padding(top=8.dp)
+                    .background(Color(0xFF221A17),RoundedCornerShape(10.dp)).padding(14.dp)) {
+                    Text(T("Scrivere nella memoria della pedaliera", "Writing into the pedal's memory"),
+                        color=Paper,fontWeight=FontWeight.Black,fontSize=13.sp,letterSpacing=1.sp)
+                    Text(T("La prova tiene il profilo solo finche' la pedaliera resta accesa: allo spegnimento torna la cassa memorizzata. Scrivere nel banco lo rende permanente, ma sovrascrive la cassa che c'e' adesso in quel banco.",
+                           "Trying a profile keeps it only while the pedal stays on: switching off brings the stored cabinet back. Writing to a slot makes it permanent, but it overwrites the cabinet that slot holds today."),
+                        color=Muted,fontSize=12.sp,modifier=Modifier.padding(top=6.dp))
+                    Text(T("Prima di toccare la pedaliera il contenuto del banco viene letto e salvato nel telefono, e dopo la scrittura il banco viene riletto e confrontato. La risposta di un profilo convertito resta comunque modellata, non misurata.",
+                           "Before the pedal is touched the slot is read and saved to the phone, and after the write the slot is read back and compared. The response of a converted profile is still modelled, not measured."),
+                        color=Muted,fontSize=12.sp,modifier=Modifier.padding(top=6.dp))
+                    Text(T("Banco di destinazione", "Destination slot").uppercase(),color=Muted,fontSize=11.sp,
+                        fontWeight=FontWeight.Bold,letterSpacing=1.4.sp,modifier=Modifier.padding(top=12.dp,bottom=6.dp))
+                    Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                        (1..3).forEach { i ->
+                            val sel = slot == i
+                            Box(Modifier.weight(1f).background(if(sel) Red else Panel,RoundedCornerShape(8.dp))
+                                .clickable{ slot = i }.padding(vertical=10.dp),contentAlignment=Alignment.Center) {
+                                Column(horizontalAlignment=Alignment.CenterHorizontally) {
+                                    Text("CAB $i",color=if(sel) Color.White else Muted,fontWeight=FontWeight.Black,fontSize=13.sp)
+                                    Text(s.cabNames[i] ?: "—",color=if(sel) Color.White else Muted,fontSize=10.sp,maxLines=1)
+                                }
+                            }
+                        }
+                    }
+                    OutlinedTextField(value=nomeBanco,onValueChange={nomeBanco=it.take(21)},
+                        label={Text(T("Nome nel banco (max 21)", "Name in the slot (max 21)"))},
+                        singleLine=true,modifier=Modifier.fillMaxWidth().padding(top=10.dp))
+                    Button(onClick={ c.writeCustomToSlot(profile, slot, nomeBanco.trim()); scrivendo = null },
+                        enabled=s.synced&&!s.busy&&nomeBanco.isNotBlank(),
+                        colors=ButtonDefaults.buttonColors(containerColor=Red,contentColor=Color.White),
+                        modifier=Modifier.fillMaxWidth().padding(top=10.dp)) {
+                        Text(T("Sovrascrivi il banco $slot", "Overwrite slot $slot"))
+                    }
+                    TextButton(onClick={ scrivendo = null },modifier=Modifier.fillMaxWidth()) {
+                        Text(T("Annulla", "Cancel"),color=Muted)
+                    }
+                }
+            }
         }
     }
 }
