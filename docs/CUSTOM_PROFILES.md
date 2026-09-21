@@ -106,12 +106,36 @@ feature never wrote.
 
 Saving a converted profile to one of the pedal's permanent slots is deliberately not offered.
 
-## Still to verify on hardware
+## Verified on hardware, 21 September 2026
 
-Nobody has yet confirmed that the live coefficient table does not survive a power cycle. It is
-expected not to, since boot reloads the stored slot, but it is one test worth doing with a profile
-that has passed the checks and the cabinet level at minimum. Until then, treat it as unknown.
+A profile fitted by the app's own code from a cabinet impulse response was loaded into a physical
+AMPED 3. The transfer completed, all five chunks were requested and served, the amplifier block was
+unchanged and the CabRig block changed only at the cabinet level, which had deliberately been set
+to its minimum beforehand. The same profile was checked independently in Python before it was sent:
+peak -1.23 dB, L1 1.62, energy 0.2460, t60 19.3 ms, all matching what the app reported to the digit.
 
-The response model has never been compared against a measured sweep at the pedal's output. A
-logarithmic sweep would settle both the topology and the sample rate assumption in an afternoon
-and is the single most useful thing anyone with a measurement rig could contribute.
+**The live coefficient table does not survive a power cycle.** After switching the pedal off and on
+the live state came back identical to the backup taken that morning: all 84 CabRig bytes and 51 of
+the 52 amplifier bytes, the only difference being offset 10, one of the unidentified bytes, moving
+by one. The custom coefficients were gone, and so were the owner's own unsaved edits. All six
+stored slots were byte-identical to the backup afterwards.
+
+This makes a power cycle a guaranteed recovery path: whatever a custom profile does to the sound,
+switching the pedal off puts the stored cabinet back.
+
+## Measuring the response: the USB route does not work
+
+The AMPED 3 presents itself as a 4-in 4-out USB audio device at 48 kHz, which at least confirms the
+sample rate the model assumes. It does not, however, give a way to measure the cabinet.
+
+Playing a logarithmic sweep into the pedal as the system output device produced digital silence on
+all four capture channels, so USB playback joins the signal after the cabinet simulation rather
+than passing through it. Recording the capture channels while the owner played the guitar gave a
+level flat to within a decibel for twenty seconds, with no transients. Raising the amplifier gain
+from 20 to 127 over USB moved the captured noise by 2.6 dB, where a live amplifier path would move
+by tens of decibels. Whatever those four channels carry in this configuration, it is not the
+processed signal.
+
+Measuring the transfer function therefore needs an audio interface on the pedal's line or
+headphone output, or a microphone on a real cabinet. Until someone does that, the response model
+stays a hypothesis and every curve the app draws is modelled rather than measured.

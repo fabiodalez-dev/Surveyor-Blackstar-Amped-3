@@ -60,6 +60,21 @@ Writing was then checked on the hardware for every offset a local preset restore
 
 The 15-byte stored format decodes as: bytes 0–8 are live offsets 0–8 in order, byte 10 is power, byte 11 is the valve response. That is how a one-byte difference in slot 2 was identified as a change of response from 6L6 to EL34.
 
+## Power cycle, 21 September 2026
+
+The live state does not survive it. With a custom coefficient table loaded and the owner's own
+unsaved edits in place, switching the pedal off and on brought back the state stored in the slot:
+84 of 84 CabRig bytes and 51 of 52 amplifier bytes identical to the backup taken that morning, the
+exception being offset 10 moving by one. The six stored slots were untouched throughout.
+
+## USB audio
+
+The pedal is also a 4-in 4-out USB audio device running at 48 kHz, which corroborates the sample
+rate the DSP model assumes. The capture channels do not carry the processed signal in this
+configuration: a sweep played through the device appeared nowhere, a guitar being played gave a
+level flat to within a decibel, and a gain change from 20 to 127 moved the captured noise by only
+2.6 dB. Measuring the cabinet response needs an interface on the analogue output instead.
+
 ## Still open
 
 Offset 32 carries channel and boost state as a bitfield; bit 6 is boost and is writable, but the meaning of the low bits is not settled — values 1, 8 and 32 were all observed after channel changes, and writing them back does not switch channels, which `02 11` does. Offsets 10, 23, 40 and 41 hold state that is not identified; 32 and 41 refuse writes and report values of the amp's own choosing.
