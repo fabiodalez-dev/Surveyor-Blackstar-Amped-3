@@ -1,3 +1,7 @@
+<div align="center">
+  <img src="docs/brand/banner.jpg" alt="Surveyor" width="100%"/>
+</div>
+
 # Surveyor (Blackstar AMPED 3 Controller)
 
 **Surveyor** is an open-source, mobile-first alternative to the official Blackstar "Architect" desktop software, specifically reverse-engineered and built for the **Blackstar AMPED 3** 100W pedal.
@@ -7,7 +11,8 @@ Born out of the frustration of needing a desktop PC to modify CabRig settings or
 <div align="center">
   <img src="docs/screen_amp.png" width="700" alt="Amp Controls"/><br><br>
   <img src="docs/screen_cab.png" width="700" alt="CabRig Settings"/><br><br>
-  <img src="docs/screen_presets.png" width="700" alt="Preset Library"/>
+  <img src="docs/screen_presets.png" width="700" alt="Preset Library"/><br><br>
+  <img src="docs/screen_ir.png" width="700" alt="Impulse response converted into a cabinet profile"/>
 </div>
 
 ---
@@ -18,7 +23,7 @@ Born out of the frustration of needing a desktop PC to modify CabRig settings or
 - **No Desktop PC Required:** Connect your Android device directly to the AMPED over USB-OTG. The app reads the amp's actual state on connect and re-reads it after every write, so the controls show hardware values instead of assumed ones. Round-trip latency has not been measured, and not every physical knob reports its movement on its own, so a manual resync covers that case.
 - **CabRig DSP Protocol Decoded:** Surveyor ships all 288 factory CabRig DSP profiles, extracted from captures of my own unit and validated against both checksum layers. I decoded the 260-byte payload format itself: it is a 16-section recursive filter cascade described by 65 float32 values, not a convolution of a stored impulse response.
 - **Cabinet profiles from an impulse response:** convert a WAV IR into the pedal's own cabinet format, on the phone, and listen to it. The fit keeps the pole bank of a factory cabinet, so a converted profile is exactly as stable as one Blackstar ships; nothing is sent unless it sits inside the envelope of the factory library, the first audition happens with the cabinet level at minimum, and one control puts the factory cabinet back. Permanent slots are never written. The reasoning, the limits and their provenance are in [docs/CUSTOM_PROFILES.md](docs/CUSTOM_PROFILES.md).
-- **Custom Profile Tools (experimental):** The offline Python tool `tools/cabrig_dsp.py` builds structurally valid non-factory profiles: it rebuilds both checksum layers, verifies pole stability after float32 quantisation, and its `--fit-ir` mode fits a WAV impulse response by solving the 33 numerator weights over the fixed pole bank of a factory profile. The resulting packets are valid by construction; their sound has not been measured yet, so treat fitted profiles as an experiment, not a feature.
+- **Offline research tools:** `tools/cabrig_dsp.py` decodes, alters and re-encodes profiles without ever opening the USB device, and `tools/safety_envelope.py` recomputes the limits used by the app from the shipped library.
 - **Deep Parameter Control:** Access DSP parameters that the pedal itself does not expose, including the Cabinet and Room levels in real decibels, with the parameter map verified against the hardware rather than assumed ([docs/PROTOCOL_VERIFICATION.md](docs/PROTOCOL_VERIFICATION.md)). The Low-Cut and High-Cut controls are shown in approximate hertz rather than as raw 0-255 values; Architect itself displays only a 0-10 position, so those figures are an estimate and are printed with a leading `~`.
 - **Guarded Preset Management:** The hardware slot saving sequence is documented and exercised. Before writing, Surveyor reads the destination slot and fsyncs a local backup; after writing it waits for the acknowledgement, rereads the slot and compares name and data, and reports an explicit unconfirmed-save status if any of those steps fails. Current coverage and its limits are in [docs/STORAGE_VERIFICATION.md](docs/STORAGE_VERIFICATION.md): CabRig verification covers all 84 bytes, AMP verification covers the first nine continuous parameters, and a power-cycle retention test is still pending.
 
@@ -108,13 +113,13 @@ The pedal has no convolution engine, so there is no such thing as uploading a WA
 3. Re-derive the poles from the quantised float32 result and refuse to emit anything whose poles left the unit circle.
 4. Rebuild both checksum layers so the amp accepts the packet.
 
-`tools/cabrig_dsp.py` does all four steps offline and never opens the USB device. Because step 1 never touches the denominators, the fit cannot produce an unstable filter; that is a structural guarantee about the filter, not a claim about how it sounds. The tool reports the relative complex fit error and the predicted peak gain in dB, and marks its own output `hardware_audio_validation: false`.
+Since v1.5.0 the app does all four steps on the phone. Import a WAV from the CabRig page and it fits the response onto the cabinet currently loaded, reports the deviation from the source in dB, draws the modelled response over the cabinet it started from, and lets you name and keep the result. `tools/cabrig_dsp.py` does the same offline for research and never opens the USB device.
 
-```bash
-python3 tools/cabrig_dsp.py app/src/main/assets/cab_profiles.json --key 21:5:0 --fit-ir mycab.wav --output /tmp/custom-cab.json
-```
+Because step 1 never touches the denominators, a fitted profile has bit for bit the poles of a profile the pedal already plays: its stability is inherited, not argued. That is a statement about the filter, not about how it sounds. Everything else is guarded by a set of limits taken from the factory library itself, each one the extreme reached across the 285 non-marginal profiles: peak gain, DC and infrasonic content, ultrasonic content, worst-case gain, energy, ringing time, tail decay, section cancellation, and the difference between a float32 and a float64 recursion. Nothing generated is allowed to do what the shipped data does not already do, and nothing is sent to the pedal unless it passes. A profile fitted from a factory cabinet's own impulse response reproduces it to better than 0.25 dB.
 
-What is not yet established: the 48 kHz sample rate is an assumption the tool labels as such, not a rate read off the hardware, and the section ordering, summation topology and gain normalisation are inferred from the disassembly and the payload layout rather than confirmed by a measured sweep. A pole bank borrowed from one cabinet also cannot represent an arbitrary long-delay impulse response however well the numerators are solved, so this is a tool for cabinet and EQ curves, not a general IR loader. Back up all six slots first, load into the live DSP only, and restore without saving if anything sounds or measures wrong. See [docs/CABRIG_DSP_FORMAT.md](docs/CABRIG_DSP_FORMAT.md) for the full account.
+Loading a profile writes the live DSP only; the six stored slots take a separate command this feature never sends, and saving a converted cabinet into permanent memory is deliberately not offered. Before anything goes out the app writes the live state, the factory payload for the cabinet in use and the cabinet level to disk, drops the level to its minimum for the first listen, and keeps one control on screen that puts the factory cabinet back. [docs/CUSTOM_PROFILES.md](docs/CUSTOM_PROFILES.md) has the threat model, the limits with their provenance, the fitting algorithm and the recovery procedure.
+
+What is still not established: the 48 kHz sample rate is an assumption, not a rate read off the hardware, and the section ordering, summation topology and gain normalisation are inferred from the disassembly and the payload layout rather than confirmed by a measured sweep, so every curve the app draws is modelled rather than measured. A pole bank borrowed from one cabinet also cannot represent an arbitrary long-delay impulse response however well the numerators are solved, so this suits cabinet and EQ curves, not reverb tails.
 
 The checked-in `cab_profiles.json` contains the complete factory 24 × 6 × 2 matrix (288 choices, 276 distinct payloads, since a few choices intentionally share data).
 
