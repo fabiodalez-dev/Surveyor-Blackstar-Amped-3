@@ -273,9 +273,9 @@ fun T(it: String, en: String) = if (lang == "it") it else en
     Section(T("Carattere", "Character"))
     Choices(T("Risposta", "Response"),s.amp[22],listOf("EL84" to 2,"EL34" to 3,"6L6" to 1),s.synced&&!s.busy){c.setParameter(false,22,it)}
     Choices(T("Potenza", "Power"),s.amp[AmpedProtocol.AMP_POWER],AmpedProtocol.powerOptions,s.synced&&!s.busy){c.setParameter(false,AmpedProtocol.AMP_POWER,it)}
-    Choices(T("Voce Clean", "Clean Voice"),s.amp[26],listOf("Warm" to 1,"Bright" to 0),s.synced&&!s.busy){c.setParameter(false,26,it)}
-    Choices(T("Voce Crunch", "Crunch Voice"),s.amp[27],listOf("Crunch" to 1,"Super" to 0),s.synced&&!s.busy){c.setParameter(false,27,it)}
-    Choices(T("Voce Overdrive", "Overdrive Voice"),s.amp[28],listOf("OD1" to 1,"OD2" to 0),s.synced&&!s.busy){c.setParameter(false,28,it)}
+    if (s.ampSlot == 1) Choices(T("Voce Clean", "Clean Voice"),s.amp[26],listOf("Warm" to 1,"Bright" to 0),s.synced&&!s.busy){c.setParameter(false,26,it)}
+    if (s.ampSlot == 2) Choices(T("Voce Crunch", "Crunch Voice"),s.amp[27],listOf("Crunch" to 1,"Super" to 0),s.synced&&!s.busy){c.setParameter(false,27,it)}
+    if (s.ampSlot == 3) Choices(T("Voce Overdrive", "Overdrive Voice"),s.amp[28],listOf("OD1" to 1,"OD2" to 0),s.synced&&!s.busy){c.setParameter(false,28,it)}
     Section(T("Boost e riverbero", "Boost and Reverb"))
     Row(verticalAlignment = Alignment.CenterVertically) {
         Checkbox(checked = (s.amp.getOrNull(AmpedProtocol.AMP_STATUS) ?: 0) and AmpedProtocol.AMP_BOOST_BIT != 0, onCheckedChange = { c.setParameter(false, AmpedProtocol.AMP_STATUS, (s.amp.getOrNull(AmpedProtocol.AMP_STATUS) ?: 0) xor AmpedProtocol.AMP_BOOST_BIT) }, enabled = s.synced && !s.busy)
