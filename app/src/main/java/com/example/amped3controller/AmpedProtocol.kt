@@ -45,6 +45,27 @@ object AmpedProtocol {
     const val AMP_STATUS = 32
     const val AMP_BOOST_BIT = 64
     const val AMP_REVERB_ON = 33
+
+    /** The 15-byte stored AMP format, as stored byte to live offset. Mapped on the hardware on
+     *  2026-09-28 by saving the active slot with one live offset changed at a time
+     *  (tools/verify_amp_stored_bytes.py): 0-8 are the knobs in order, then boost position,
+     *  reverb character, valve response and the clean, crunch and OD voices. Power, Master,
+     *  reverb on/off and the boost bit are not part of a stored slot. The pedal stores its live
+     *  state, not the 52 bytes carried by the save packet. */
+    val ampStoredOffsets: Map<Int, Int> = (0..8).associateWith { it } +
+        mapOf(9 to 24, 10 to 25, 11 to 22, 12 to 26, 13 to 27, 14 to 28)
+
+    /** The live AMP values a stored slot should read back as, keyed by stored byte. */
+    fun expectedAmpStored(amp: List<Int>): Map<Int, Int> = ampStoredOffsets.mapValues { (_, live) -> amp[live] }
+
+    fun ampStoredMatches(stored: List<Int>, amp: List<Int>): Boolean =
+        stored.size == 15 && expectedAmpStored(amp).all { (byte, value) -> stored[byte] == value }
+
+    /** Whether the value a parameter reads back as confirms the one written. Offset 32 is a
+     *  bitfield whose low bits the pedal sets itself; only the boost bit is ours to compare. */
+    fun accepted(cab: Boolean, offset: Int, written: Int, readBack: Int): Boolean =
+        if (!cab && offset == AMP_STATUS) (written and AMP_BOOST_BIT) == (readBack and AMP_BOOST_BIT)
+        else written == readBack
     fun packet(vararg values: Int): ByteArray {
         require(values.size <= 64 && values.all { it in 0..255 })
         return ByteArray(64).also { b -> values.forEachIndexed { i, v -> b[i] = v.toByte() } }

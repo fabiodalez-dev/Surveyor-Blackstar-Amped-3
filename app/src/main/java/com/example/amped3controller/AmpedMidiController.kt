@@ -5,7 +5,8 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.hardware.usb.*
+import android.hardware.usb.UsbDevice
+import android.hardware.usb.UsbManager
 import android.os.Build
 import androidx.core.content.ContextCompat
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -13,13 +14,15 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import org.json.JSONArray
 import org.json.JSONObject
-import java.io.File
-import java.nio.ByteBuffer
 import java.util.concurrent.LinkedBlockingQueue
-import java.util.concurrent.TimeoutException
 import java.util.concurrent.atomic.AtomicBoolean
 
-/** Historical class name retained; transport is now vendor HID, not MIDI. */
+/**
+ * The pedal's protocol: synchronisation, parameter writes, slot saves, DSP transfers and the
+ * audition recovery. The USB pipe lives in [UsbHidLink], everything kept on the phone in
+ * [LibraryStore], the IR fit in [IrConversion]. Historical class name retained; the transport
+ * is vendor HID, not MIDI.
+ */
 class AmpedMidiController(private val context: Context) {
     private val manager = context.getSystemService(Context.USB_SERVICE) as UsbManager
     private val permissionAction = "${context.packageName}.USB_PERMISSION"
@@ -29,41 +32,18 @@ class AmpedMidiController(private val context: Context) {
     private var worker: Thread? = null
     private var deviceId: Int? = null
     private val commands = LinkedBlockingQueue<() -> Unit>()
-    private var connection: UsbDeviceConnection? = null
-    private var hidInterface: UsbInterface? = null
-    private var request: UsbRequest? = null
-    private var epOut: UsbEndpoint? = null
-    private var queued = false
-    private val input = ByteBuffer.allocateDirect(64)
-    private var profiles = JSONArray(context.assets.open("cab_profiles.json").bufferedReader().use { it.readText() })
+    private val link = UsbHidLink(manager, ::log)
+    private val profiles = FactoryProfiles(context.assets.open("cab_profiles.json").bufferedReader().use { it.readText() })
     private val operation = OperationGate()
     private var liveProfile: JSONObject? = null
     private val slotProfiles = mutableMapOf<Int, JSONObject>() // valid only in this uninterrupted USB session
     private var syncDeadline = 0L
     private val savedReports = linkedMapOf<String, String>()
-    private val customFile = File(context.filesDir, "custom_profiles.json")
-    private val auditionFile = File(context.filesDir, "audition.json")
-    private val presetsFile = File(context.filesDir, "presets.json")
-    private val presetsMutable = MutableStateFlow(readPresets())
-    val presets = presetsMutable.asStateFlow()
-    private val customMutable = MutableStateFlow(readCustom())
-    val customProfiles = customMutable.asStateFlow()
-    private val recoveryMutable = MutableStateFlow(readRecoveries())
-    val recoveries = recoveryMutable.asStateFlow()
-    private fun readRecoveries(): List<LocalPreset> = context.filesDir.listFiles().orEmpty()
-        .filter { (it.name.startsWith("backup-") || it.name == "audition.json") && !it.name.endsWith(".tmp") }
-        .mapNotNull { file -> runCatching { Recovery.cabPreset(file.name, JSONObject(file.readText())) }.getOrNull() }
-        .sortedByDescending { it.id }
+    private val store = LibraryStore(context.filesDir, ::log)
+    val presets = store.presets
+    val customProfiles = store.customProfiles
+    val recoveries = store.recoveries
 
-    /** A fitted candidate waiting for the user to decide: audition it, save it, or drop it. */
-    class Conversion(
-        val header: String, val chunks: List<String>, val templateKey: String,
-        val templateHeader: String, val templateChunks: List<String>,
-        val cab: Int, val mic: Int, val axis: Int, val source: String,
-        val rate: Double, val channels: Int, val usedMs: Int, val truncated: Boolean,
-        val errorDb: Double, val attenuatedDb: Double,
-        val verdict: com.example.amped3controller.dsp.SafetyCheck.Verdict
-    )
     private val conversionMutable = MutableStateFlow<Conversion?>(null)
     val conversion = conversionMutable.asStateFlow()
     private var registered = true
@@ -81,23 +61,23 @@ class AmpedMidiController(private val context: Context) {
             }
         }
     }
+    /** A value the pedal read back differently from what was written. The state is still in
+     *  sync, it just is not the requested one, so this must not mark the pedal as unsynced. */
+    private class NotAccepted(message: String) : IllegalStateException(message)
+
     init {
         // a profile left in the live DSP by a previous run must still be revertible after a
         // restart, which is the whole point of writing the snapshot to disk before sending
-        if (auditionFile.exists()) {
-            val name = runCatching { JSONObject(auditionFile.readText()).optString("name") }.getOrDefault("")
-            mutable.update { it.copy(customLoaded = true, customName = name) }
-        }
+        if (store.auditionOutstanding()) mutable.update { it.copy(customLoaded = true, customName = store.auditionName()) }
         val filter = IntentFilter(permissionAction).apply {
             addAction(UsbManager.ACTION_USB_DEVICE_ATTACHED)
             addAction(UsbManager.ACTION_USB_DEVICE_DETACHED)
         }
         ContextCompat.registerReceiver(context, receiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
-        val backup = File(context.filesDir, "backup-originale-mac.json")
-        if (!backup.exists()) backup.writeText(context.assets.open("original_backup.json").bufferedReader().use { it.readText() })
+        store.seedOriginalBackup { context.assets.open("original_backup.json").bufferedReader().use { it.readText() } }
     }
     private fun log(s: String) { mutable.update { it.copy(logs = (s + "\n" + it.logs).take(12000)) } }
-        
+
     fun connectToAmp() {
         if (running.get()) { refresh(); return }
         val d = manager.deviceList.values.firstOrNull { it.vendorId == AmpedProtocol.VID && it.productId == AmpedProtocol.PID }
@@ -113,21 +93,11 @@ class AmpedMidiController(private val context: Context) {
         if (worker?.isAlive == true || !running.compareAndSet(false, true)) return
         worker = Thread({
             try {
-                val iface = (0 until d.interfaceCount).map { d.getInterface(it) }.firstOrNull { it.interfaceClass == UsbConstants.USB_CLASS_HID }
-                    ?: error("Interfaccia HID non trovata")
-                val ep = (0 until iface.endpointCount).map { iface.getEndpoint(it) }.firstOrNull { it.direction == UsbConstants.USB_DIR_IN && it.type == UsbConstants.USB_ENDPOINT_XFER_INT }
-                    ?: error("Endpoint HID IN non trovato")
-                epOut = (0 until iface.endpointCount).map { iface.getEndpoint(it) }.firstOrNull { it.direction == UsbConstants.USB_DIR_OUT && it.type == UsbConstants.USB_ENDPOINT_XFER_INT }
-                val conn = manager.openDevice(d) ?: error("Apertura USB fallita")
-                connection = conn; hidInterface = iface
-                check(conn.claimInterface(iface, true)) { "Interfaccia HID occupata" }
-                request = UsbRequest().also { check(it.initialize(conn, ep)) }
-                queued = false
+                link.open(d)
                 savedReports.clear()
                 liveProfile = null
                 slotProfiles.clear()
-                mutable.update { AmpState(connected = true, status = T("Lettura della pedaliera…", "Reading the pedal…"), logs = it.logs, customLoaded = auditionFile.exists(), customName = it.customName) }
-                log("HID ${iface.id}, endpoint ${ep.address}, packet ${ep.maxPacketSize}")
+                mutable.update { AmpState(connected = true, status = T("Lettura della pedaliera…", "Reading the pedal…"), logs = it.logs, customLoaded = store.auditionOutstanding(), customName = it.customName) }
                 startSync()
                 for (slot in 1..3) for (kind in listOf(0x14,0x15,4,5)) write(AmpedProtocol.packet(2,kind,slot,0))
                 while (running.get()) {
@@ -143,31 +113,14 @@ class AmpedMidiController(private val context: Context) {
                 if (running.get()) { log("Errore: ${e.message}"); mutable.update { it.copy(connected = false, synced = false, busy = false, status = e.message ?: T("Errore USB", "USB error")) } }
             } finally {
                 running.set(false)
-                runCatching { request?.cancel() }; runCatching { request?.close() }
-                hidInterface?.let { runCatching { connection?.releaseInterface(it) } }
-                runCatching { connection?.close() }
-                request = null; connection = null; liveProfile = null; queued = false; operation.end()
+                link.close()
+                liveProfile = null; operation.end()
                 commands.clear()
             }
         }, "AMPED-HID").also { it.start() }
     }
-    private fun write(bytes: ByteArray) {
-        var count = connection?.controlTransfer(0x21, 9, 0x0200, hidInterface!!.id, bytes, 64, 1000) ?: -1
-        if (count < 0 && epOut != null) {
-            count = connection?.bulkTransfer(epOut, bytes, bytes.size, 1000) ?: -1
-        }
-        check(count == 64) { "Invio USB incompleto ($count/64)" }
-        log("→ " + AmpedProtocol.hex(bytes).take(32))
-    }
-    private fun readReport(): ByteArray? {
-        if (!queued) { input.clear(); check(request!!.queue(input)) { "Lettura HID non avviata" }; queued = true }
-        val result = try { connection!!.requestWait(40) } catch (_: TimeoutException) { return null }
-        if (result == null) { if (!running.get()) return null; error("Connessione USB interrotta") }
-        queued = false
-        val length = input.position()
-        if (length != 64) { log("Report incompleto: $length"); return null }
-        input.flip(); return ByteArray(length).also { input.get(it) }
-    }
+    private fun write(bytes: ByteArray) = link.write(bytes)
+    private fun readReport(): ByteArray? = link.read(running.get())
     private fun startSync() {
         syncDeadline = System.currentTimeMillis() + 4000
         mutable.update { it.copy(synced = false, amp = List(52){-1}, cab = List(84){-1}, status = T("Sincronizzazione…", "Syncing…")) }
@@ -199,28 +152,28 @@ class AmpedMidiController(private val context: Context) {
                     val name = b.copyOfRange(4,4+len).takeWhile { it != 0.toByte() }.toByteArray().toString(Charsets.US_ASCII)
                     mutable.update { if (kind == 4) it.copy(cabNames = it.cabNames + (slot to name)) else it.copy(ampNames = it.ampNames + (slot to name)) }
                 }
-                if (savedReports.size == 15) saveHardwareBackup()
+                if (savedReports.size == 15) store.writeHardwareSnapshot(savedReports)
             }
         }
     }
-    private fun saveHardwareBackup() {
-        val root = JSONObject().put("device", "AMPED 3").put("created", System.currentTimeMillis()).put("reports", JSONObject(savedReports as Map<*,*>))
-        val file = File(context.filesDir, "backup-hardware-${System.currentTimeMillis()}.json")
-        Recovery.write(file, root.toString(2)); log("Backup hardware: ${file.name}")
-    }
-    /** Reservation happens on the caller thread; unsolicited reports cannot release it. */
-    private fun enqueue(label: String, requireSync: Boolean = true, action: () -> Unit) {
+    /** Reservation happens on the caller thread; unsolicited reports cannot release it.
+     *  [afterSync] runs on the state read back after [action], to check what the pedal accepted. */
+    private fun enqueue(label: String, requireSync: Boolean = true, afterSync: () -> Unit = {}, action: () -> Unit) {
         if (!running.get() || (requireSync && !state.value.synced) || !operation.begin()) return
         mutable.update { it.copy(busy = true, status = label) }
         commands.offer {
             try {
                 action()
                 syncNow()
+                afterSync()
+            } catch (e: NotAccepted) {
+                log("Valore non accettato: ${e.message}")
+                mutable.update { it.copy(status = e.message ?: "") }
             } catch (e: Exception) {
                 log("Operazione non confermata: ${e.message}")
                 mutable.update { it.copy(synced = false, status = e.message ?: "USB error") }
             } finally {
-                recoveryMutable.value = readRecoveries()
+                store.refreshRecoveries()
                 operation.end()
                 mutable.update { it.copy(busy = false) }
             }
@@ -234,8 +187,17 @@ class AmpedMidiController(private val context: Context) {
         }
         check(running.get() && state.value.synced) { "Sincronizzazione non confermata" }
     }
+    /** Compares the resynchronised state with what was written. A write the pedal ignores, or
+     *  answers with a value of its own, is reported instead of being taken as done. */
+    private fun requireAccepted(amp: Map<Int, Int>, cab: Map<Int, Int>) {
+        val s = state.value
+        val refused = amp.filter { (o, v) -> !AmpedProtocol.accepted(false, o, v, s.amp[o]) }.map { (o, v) -> "AMP $o: $v → ${s.amp[o]}" } +
+            cab.filter { (o, v) -> !AmpedProtocol.accepted(true, o, v, s.cab[o]) }.map { (o, v) -> "CAB $o: $v → ${s.cab[o]}" }
+        if (refused.isNotEmpty()) throw NotAccepted(T("La pedaliera non ha accettato ${refused.joinToString()}", "The pedal did not accept ${refused.joinToString()}"))
+    }
     fun refresh() = enqueue("Sincronizzazione…", false) { }
-    fun setParameter(cab: Boolean, offset: Int, value: Int) = enqueue("Aggiornamento…") {
+    fun setParameter(cab: Boolean, offset: Int, value: Int) = enqueue("Aggiornamento…",
+        afterSync = { if (cab) requireAccepted(emptyMap(), mapOf(offset to value)) else requireAccepted(mapOf(offset to value), emptyMap()) }) {
         write(AmpedProtocol.parameter(cab, offset, value))
     }
     fun recallCab(slot: Int) = enqueue("Cambio CabRig…") {
@@ -247,14 +209,13 @@ class AmpedMidiController(private val context: Context) {
         require(slot in 1..3)
         write(AmpedProtocol.packet(2, 0x11, slot, 0))
     }
-    private fun profile(cab: Int, mic: Int, axis: Int): JSONObject? = (0 until profiles.length()).map { profiles.getJSONObject(it) }.firstOrNull { it.getInt("cab")==cab && it.getInt("mic")==mic && it.getInt("axis")==axis }
     fun chooseCab(cab: Int, mic: Int, axis: Int) {
-        val p = profile(cab,mic,axis) ?: return
+        val p = profiles.find(cab,mic,axis) ?: return
         enqueue("Caricamento CabRig…") { transfer(p) }
     }
     fun applyEqPreset(name: String) {
         val preset = AmpedProtocol.eqPresets[name] ?: return
-        enqueue("Equalizzazione…") {
+        enqueue("Equalizzazione…", afterSync = { requireAccepted(emptyMap(), preset) }) {
             preset.forEach { (offset, value) -> write(AmpedProtocol.parameter(true, offset, value)) }
         }
     }
@@ -293,51 +254,38 @@ class AmpedMidiController(private val context: Context) {
             mutable.update { it.copy(status = e.message ?: T("Nome non valido", "Invalid name")) }; return
         }
         enqueue("Backup prima del salvataggio…") {
-            run {
-                val previous = readStored(cab, slot)
-                val oldDsp = if (cab) requireSlotDsp(slot, previous) else null
-                if (cab) check(liveProfile != null) { "Applica prima un profilo DSP noto" }
-                val backup = JSONObject().put("kind", if (cab) "cab" else "amp").put("slot", slot)
-                    .put("stored", JSONObject(previous as Map<*, *>)).put("dsp", oldDsp)
-                    .put("liveAmp", JSONArray(snapshot.amp)).put("liveCab", JSONArray(snapshot.cab))
-                val file = File(context.filesDir, "backup-before-save-${System.nanoTime()}.json")
-                java.io.FileOutputStream(file).use { stream ->
-                    stream.write(backup.toString(2).toByteArray(Charsets.UTF_8)); stream.fd.sync()
-                }
-                check(JSONObject(file.readText()).getJSONObject("stored").length() == previous.size)
-                log("Backup persistito: ${file.name}")
-                if (cab) write(AmpedProtocol.packet(0xaf, slot - 1, 0, 0))
-                else write(AmpedProtocol.saveAmpPacket(slot, snapshot.amp))
-                write(encodedName)
-                if (cab) awaitReport { (it[0].toInt() and 255) == 0xaf && (it[1].toInt() and 255) == slot - 1 }
-                var verified = false
-                val deadline = System.currentTimeMillis() + 4000
-                while (!verified && System.currentTimeMillis() < deadline) {
-                    val actual = readStored(cab, slot)
-                    val storedName = actual.entries.first { it.key.startsWith(if (cab) "4:" else "20:") }.value
-                    val readName = AmpedProtocol.decodeHex(storedName).takeWhile { it != 0.toByte() }.toByteArray().toString(Charsets.US_ASCII)
-                    val values = if (cab) AmpedProtocol.decodeHex(actual.getValue("5:60") + actual.getValue("5:24")).map { it.toInt() and 255 }
-                    else AmpedProtocol.decodeHex(actual.getValue("21:15")).take(9).map { it.toInt() and 255 }
-                    verified = readName == name && values == if (cab) snapshot.cab else snapshot.amp.take(9)
-                }
-                check(verified) { "Lo slot riletto non coincide: conserva il backup, non ripetere il salvataggio" }
-                log("Slot $slot verificato: nome e ${if (cab) "84 parametri CabRig" else "9 parametri AMP continui"}")
-                mutable.update { if (cab) it.copy(cabNames = it.cabNames + (slot to name)) else it.copy(ampNames = it.ampNames + (slot to name)) }
-                if (cab) slotProfiles[slot] = liveProfile!!
+            val previous = readStored(cab, slot)
+            val oldDsp = if (cab) requireSlotDsp(slot, previous) else null
+            if (cab) check(liveProfile != null) { "Applica prima un profilo DSP noto" }
+            store.writeBackup("backup-before-save", JSONObject().put("kind", if (cab) "cab" else "amp").put("slot", slot)
+                .put("stored", JSONObject(previous as Map<*, *>)).put("dsp", oldDsp)
+                .put("liveAmp", JSONArray(snapshot.amp)).put("liveCab", JSONArray(snapshot.cab)))
+            if (cab) write(AmpedProtocol.packet(0xaf, slot - 1, 0, 0))
+            else write(AmpedProtocol.saveAmpPacket(slot, snapshot.amp))
+            write(encodedName)
+            if (cab) awaitReport { (it[0].toInt() and 255) == 0xaf && (it[1].toInt() and 255) == slot - 1 }
+            var verified = false
+            val deadline = System.currentTimeMillis() + 4000
+            while (!verified && System.currentTimeMillis() < deadline) {
+                val actual = readStored(cab, slot)
+                verified = if (cab) Recovery.verifyCab(actual, name, snapshot.cab) else Recovery.verifyAmp(actual, name, snapshot.amp)
             }
+            check(verified) { "Lo slot riletto non coincide: conserva il backup, non ripetere il salvataggio" }
+            log("Slot $slot verificato: nome e ${if (cab) "84 parametri CabRig" else "tutti i 15 byte AMP memorizzati"}")
+            mutable.update { if (cab) it.copy(cabNames = it.cabNames + (slot to name)) else it.copy(ampNames = it.ampNames + (slot to name)) }
+            if (cab) slotProfiles[slot] = liveProfile!!
         }
     }
-    /** Unknown slots cannot be recovered from their selector bytes alone. */
-    /** User explicitly identifies a factory slot. This reads only; custom slots must not use it. */
+    /** User explicitly identifies a factory slot. This reads only; custom slots must not use it,
+     *  because selector indices alone cannot recover custom coefficients. */
     fun confirmFactorySlot(slot: Int) = enqueue("Backup della cassa originale nel banco $slot…") {
         require(slot in 1..3)
         val records = readStored(true, slot)
         val cab = Recovery.storedCab(records)
-        val dsp = profile(cab[0], cab[1], cab[2]) ?: error("Profilo originale sconosciuto")
-        val backup = JSONObject().put("kind", "cab").put("slot", slot)
+        val dsp = profiles.find(cab[0], cab[1], cab[2]) ?: error("Profilo originale sconosciuto")
+        store.writeBackup("backup-factory", JSONObject().put("kind", "cab").put("slot", slot)
             .put("stored", JSONObject(records as Map<*, *>)).put("dsp", dsp)
-            .put("provenance", "factory-confirmed-by-user")
-        Recovery.write(File(context.filesDir, "backup-factory-${System.nanoTime()}.json"), backup.toString(2))
+            .put("provenance", "factory-confirmed-by-user"))
         slotProfiles[slot] = dsp
         log("Backup parametri e profilo originale banco $slot salvato; nessuna scrittura USB")
     }
@@ -347,9 +295,8 @@ class AmpedMidiController(private val context: Context) {
         val values = Recovery.storedCab(records)
         check(values.take(3) == listOf(custom.cab, custom.mic, custom.axis)) { "Il template del banco non coincide con quello del custom" }
         val dsp = Recovery.validateProfile(custom.transferJson())
-        Recovery.write(File(context.filesDir, "backup-custom-confirmed-${System.nanoTime()}.json"),
-            JSONObject().put("kind", "cab").put("slot", slot).put("stored", JSONObject(records as Map<*, *>))
-                .put("dsp", dsp).put("provenance", "custom-identity-confirmed-by-user").toString(2))
+        store.writeBackup("backup-custom-confirmed", JSONObject().put("kind", "cab").put("slot", slot)
+            .put("stored", JSONObject(records as Map<*, *>)).put("dsp", dsp).put("provenance", "custom-identity-confirmed-by-user"))
         slotProfiles[slot] = dsp
     }
     private fun requireSlotDsp(slot: Int, stored: Map<String, String>): JSONObject {
@@ -371,39 +318,21 @@ class AmpedMidiController(private val context: Context) {
             ::write, ::readReport, ::receive, { running.get() })
         liveProfile = JSONObject(p.toString())
     }
-    private fun readPresets(): List<LocalPreset> {
-        if (!presetsFile.exists()) return emptyList()
-        return runCatching {
-            val (good, rejected) = Recovery.recoverPresets(presetsFile.readText())
-            if (rejected > 0) {
-                presetsFile.copyTo(File(context.filesDir, "backup-invalid-presets-${System.nanoTime()}.txt"))
-                log("Recuperati ${good.size} preset validi; $rejected record non validi conservati nel backup")
-            }
-            good
-        }.getOrElse {
-            presetsFile.copyTo(File(context.filesDir, "backup-invalid-presets-${System.nanoTime()}.txt"))
-            log("Libreria non valida conservata per recupero: ${it.message}")
-            emptyList()
-        }
-    }
     @Synchronized fun saveLocal(name: String) {
         val s = state.value
         if (!s.synced || s.busy || name.isBlank()) return
         val dsp = liveProfile?.takeIf { listOf(it.getInt("cab"),it.getInt("mic"),it.getInt("axis")) == s.cab.take(3) } ?: run {
             mutable.update { it.copy(status = "Profilo DSP attuale sconosciuto: applica una cassa o un custom prima di salvare il preset locale") }; return
         }
-        val list = presetsMutable.value + LocalPreset(System.currentTimeMillis().toString(), name.trim().take(60), s.amp, s.cab, s.ampSlot, dsp.toString())
-        runCatching { persist(list) }.onFailure { e -> mutable.update { it.copy(status = "Salvataggio locale fallito: ${e.message}") } }
-    }
-    @Synchronized private fun persist(list: List<LocalPreset>) {
-        val json = JSONArray(list.map { it.json() }).toString(2)
-        LocalPreset.parseList(json)
-        Recovery.write(presetsFile, json)
-        presetsMutable.value = list
+        val preset = LocalPreset(System.currentTimeMillis().toString(), name.trim().take(60), s.amp, s.cab, s.ampSlot, dsp.toString())
+        runCatching { store.addPreset(preset) }.onFailure { e -> mutable.update { it.copy(status = "Salvataggio locale fallito: ${e.message}") } }
     }
     fun applyLocal(p: LocalPreset) {
-        val coeff = p.dsp?.let { JSONObject(it) } ?: profile(p.cab[0],p.cab[1],p.cab[2]) ?: return
-        enqueue("Caricamento ${p.name}…") {
+        val coeff = p.dsp?.let { JSONObject(it) } ?: profiles.find(p.cab[0],p.cab[1],p.cab[2]) ?: return
+        val ampOffsets = listOf(0,1,2,3,4,5,6,7,8,22,24,25,26,27,28,33)
+        val expectedAmp = if (p.scope != "cab") ampOffsets.associateWith { p.amp[it] } + (AmpedProtocol.AMP_STATUS to p.amp[AmpedProtocol.AMP_STATUS]) else emptyMap()
+        val expectedCab = if (p.scope != "amp") AmpedProtocol.cabPresetOffsets.associateWith { p.cab[it] } else emptyMap()
+        enqueue("Caricamento ${p.name}…", afterSync = { requireAccepted(expectedAmp, expectedCab) }) {
             val originalAmp = state.value.amp
             if (p.scope != "cab" && p.ampSlot in 1..3) {
                 write(AmpedProtocol.packet(2,0x11,p.ampSlot,0))
@@ -412,9 +341,9 @@ class AmpedMidiController(private val context: Context) {
                 write(AmpedProtocol.parameter(false,AmpedProtocol.AMP_POWER,originalAmp[AmpedProtocol.AMP_POWER]))
             }
             if (p.scope != "cab") {
-            for (i in listOf(0,1,2,3,4,5,6,7,8,22,24,25,26,27,28,33)) write(AmpedProtocol.parameter(false,i,p.amp[i]))
-            val status = (state.value.amp[AmpedProtocol.AMP_STATUS] and AmpedProtocol.AMP_BOOST_BIT.inv()) or (p.amp[AmpedProtocol.AMP_STATUS] and AmpedProtocol.AMP_BOOST_BIT)
-            write(AmpedProtocol.parameter(false,AmpedProtocol.AMP_STATUS,status))
+                for (i in ampOffsets) write(AmpedProtocol.parameter(false,i,p.amp[i]))
+                val status = (state.value.amp[AmpedProtocol.AMP_STATUS] and AmpedProtocol.AMP_BOOST_BIT.inv()) or (p.amp[AmpedProtocol.AMP_STATUS] and AmpedProtocol.AMP_BOOST_BIT)
+                write(AmpedProtocol.parameter(false,AmpedProtocol.AMP_STATUS,status))
             }
             if (p.scope != "amp") {
                 transfer(coeff)
@@ -439,49 +368,13 @@ class AmpedMidiController(private val context: Context) {
 
     // --- impulse response conversion -----------------------------------------------------
 
-    private fun readCustom(): List<CustomProfile> = runCatching {
-        if (!customFile.exists()) emptyList() else CustomProfile.parseList(customFile.readText())
-    }.getOrDefault(emptyList())
-
-    /**
-     * Fits a WAV impulse response onto the pole bank of the cabinet currently loaded, so the
-     * denominators, and with them the stability, are the pedal's own. The result is held as a
-     * pending conversion and is never sent anywhere until the user asks.
-     */
+    /** Runs [IrConversion] off the USB queue: it must not wait behind hardware commands, and it
+     *  has to work with no pedal attached. The result is never sent anywhere until the user asks. */
     fun convertIr(bytes: ByteArray, source: String) {
         if (!operation.begin()) return
         mutable.update { it.copy(busy = true, status = T("Conversione della risposta…", "Converting the impulse response…")) }
-        // pure arithmetic, no USB: it must not queue behind hardware commands, and it has to work
-        // with no pedal attached so the result can be inspected before anything is sent
         Thread {
-            val outcome = runCatching {
-                val audio = com.example.amped3controller.dsp.Wav.decode(bytes)
-                    ?: error(T("File WAV non leggibile", "Cannot read that WAV file"))
-                val prepared = com.example.amped3controller.dsp.Fit.prepare(audio)
-                if (prepared.size < 64) error(T("La risposta e' troppo corta o silenziosa", "That impulse response is too short or silent"))
-                val s = state.value
-                // the three profiles that quantise onto the unit circle are shipped data, not a
-                // licence to generate more of the same, so they are never used as a template
-                val marginal = setOf("7:5:0", "22:5:0", "22:5:1")
-                var key = "${s.cab[0]}:${s.cab[1]}:${s.cab[2]}"
-                var json = profile(s.cab[0], s.cab[1], s.cab[2])
-                if (json == null || key in marginal) { json = profile(21, 5, 0); key = "21:5:0" }
-                val template = com.example.amped3controller.dsp.CabProfile.decode(
-                    json!!.getString("header"),
-                    (0 until json.getJSONArray("chunks").length()).map { json.getJSONArray("chunks").getString(it) }
-                ) ?: error(T("Profilo di riferimento non leggibile", "Cannot read the reference profile"))
-                val fitted = com.example.amped3controller.dsp.Fit.fit(
-                    template, com.example.amped3controller.dsp.Fit.minimumPhase(prepared), audio.rate)
-                val encoded = com.example.amped3controller.dsp.CabProfile.encode(json.getString("header"), fitted.values)
-                    ?: error(T("Codifica fallita", "Encoding failed"))
-                Conversion(encoded.first, encoded.second, key,
-                    json.getString("header"),
-                    (0 until json.getJSONArray("chunks").length()).map { json.getJSONArray("chunks").getString(it) },
-                    json.getInt("cab"), json.getInt("mic"), json.getInt("axis"), source,
-                    audio.rate, audio.channels,
-                    (prepared.size * 1000.0 / audio.rate).toInt(), prepared.size < audio.samples.size,
-                    fitted.errorDb, fitted.attenuatedDb, fitted.verdict)
-            }
+            val outcome = runCatching { IrConversion.convert(bytes, source, state.value.cab, profiles) }
             operation.end()
             outcome.onSuccess { c ->
                 conversionMutable.value = c
@@ -512,27 +405,16 @@ class AmpedMidiController(private val context: Context) {
         return true
     }
 
-    @Synchronized fun saveConversion(name: String) {
+    fun saveConversion(name: String) {
         val c = conversionMutable.value ?: return
         if (name.isBlank()) return
         val entry = CustomProfile(System.currentTimeMillis().toString(), name.trim().take(60),
             System.currentTimeMillis(), c.source, c.templateKey, c.cab, c.mic, c.axis,
             c.header, c.chunks, c.errorDb, c.attenuatedDb, c.verdict.passed)
-        if (customMutable.value.size >= 200) { mutable.update { it.copy(status = "Limite 200 profili raggiunto") }; return }
-        val list = customMutable.value + entry
-        runCatching {
-            Recovery.write(customFile, JSONArray(list.map { it.json() }).toString())
-            customMutable.value = list
-        }.onFailure { e -> mutable.update { it.copy(status = e.message ?: "") } }
+        store.addCustom(entry)?.let { reason -> mutable.update { it.copy(status = reason) } }
     }
 
-    @Synchronized fun deleteCustom(id: String) {
-        val list = customMutable.value.filterNot { it.id == id }
-        runCatching {
-            Recovery.write(customFile, JSONArray(list.map { it.json() }).toString())
-            customMutable.value = list
-        }
-    }
+    fun deleteCustom(id: String) = store.deleteCustom(id)
 
     /**
      * Loads a profile into the live DSP for listening. Before anything goes out, the current live
@@ -541,9 +423,9 @@ class AmpedMidiController(private val context: Context) {
      * the first time you hear something new it should not be at gig volume.
      */
     private fun preserveAudition(s: AmpState, name: String) {
-        if (auditionFile.exists()) return // keep the first pre-audition state across A/B tests
+        if (store.auditionOutstanding()) return // keep the first pre-audition state across A/B tests
         val back = liveProfile?.takeIf { listOf(it.getInt("cab"),it.getInt("mic"),it.getInt("axis")) == s.cab.take(3) } ?: error("DSP attuale sconosciuto: applica prima una cassa nota; nessuna prova inviata")
-        Recovery.preserve(auditionFile) { JSONObject().put("cab", JSONArray(s.cab))
+        store.preserveAudition { JSONObject().put("cab", JSONArray(s.cab))
             .put("factory", back).put("level", s.cab[AmpedProtocol.CAB_CABINET_LEVEL])
             .put("name", name).put("at", System.currentTimeMillis()).toString() }
         mutable.update { it.copy(customLoaded = true, customName = name) }
@@ -559,7 +441,7 @@ class AmpedMidiController(private val context: Context) {
     }
     fun revertAudition() {
         enqueue("Ripristino del profilo precedente…") {
-            val saved = JSONObject(auditionFile.readText())
+            val saved = store.readAudition()
             write(AmpedProtocol.parameter(true, AmpedProtocol.CAB_CABINET_LEVEL, 0))
             transfer(saved.getJSONObject("factory"))
             val old = saved.getJSONArray("cab")
@@ -569,7 +451,7 @@ class AmpedMidiController(private val context: Context) {
             write(AmpedProtocol.parameter(true, AmpedProtocol.CAB_CABINET_LEVEL, saved.getInt("level")))
             syncNow()
             check(state.value.cab[AmpedProtocol.CAB_CABINET_LEVEL] == saved.getInt("level"))
-            check(auditionFile.delete()) { "Impossibile eliminare il recupero confermato" }
+            store.clearAudition()
             mutable.update { it.copy(customLoaded = false, customName = "") }
         }
     }
@@ -582,10 +464,9 @@ class AmpedMidiController(private val context: Context) {
             val s = state.value
             val previous = readStored(true, slot)
             val oldDsp = requireSlotDsp(slot, previous)
-            val backup = JSONObject().put("kind", "cab").put("slot", slot)
+            store.writeBackup("backup-before-save", JSONObject().put("kind", "cab").put("slot", slot)
                 .put("stored", JSONObject(previous as Map<*, *>)).put("dsp", oldDsp)
-                .put("liveCab", JSONArray(s.cab)).put("replacedBy", custom.name)
-            Recovery.write(File(context.filesDir, "backup-before-save-${System.nanoTime()}.json"), backup.toString(2))
+                .put("liveCab", JSONArray(s.cab)).put("replacedBy", custom.name))
             preserveAudition(s, custom.name)
             write(AmpedProtocol.parameter(true, AmpedProtocol.CAB_CABINET_LEVEL, 0))
             transfer(custom.transferJson())
@@ -603,69 +484,23 @@ class AmpedMidiController(private val context: Context) {
         }
     }
 
-    /** True when a previous session left a custom profile in the live DSP. */
-    fun auditionOutstanding() = auditionFile.exists()
-
-    @Synchronized fun exportData(): String {
-        val backups = JSONArray()
-        context.filesDir.listFiles()?.filter { it.name.startsWith("backup-") && !it.name.endsWith(".tmp") }?.forEach {
-            backups.put(JSONObject().put("name", it.name).put("contents", it.readText()))
-        }
-        val root = JSONObject().put("format", "amped-usb-library-v2")
-            .put("presets", JSONArray(presetsMutable.value.map { it.json() }))
-            .put("customProfiles", JSONArray(customMutable.value.map { it.json() }))
-            .put("hardwareBackups", backups)
-        if (auditionFile.exists()) root.put("audition", JSONObject(auditionFile.readText()))
-        return root.toString(2)
-    }
-    @Synchronized fun importData(data: String): String = runCatching {
+    fun exportData(): String = store.export()
+    fun importData(data: String): String = runCatching {
         check(!operation.active) { "Attendi la fine dell’operazione in corso" }
         require(data.length <= 32_000_000) { "File troppo grande" }
         if (data.trim().startsWith("<")) {
             var p = ArchitectPreset.parse(data)
-            if (p.scope == "cab") p = p.copy(dsp = profile(p.cab[0],p.cab[1],p.cab[2])!!.toString())
-            persist((presetsMutable.value + p).distinctBy { it.id })
+            if (p.scope == "cab") p = p.copy(dsp = profiles.find(p.cab[0],p.cab[1],p.cab[2])!!.toString())
+            store.importPreset(p)
             return "Importato preset Architect ${p.scope}: ${p.name} (casse originali)"
         }
-        val archive = LibraryArchive.parse(data)
-        val list = (presetsMutable.value + archive.presets).distinctBy { it.id }
-        val customs = (customMutable.value + archive.custom).distinctBy { it.id }
-        require(list.size <= 1000 && customs.size <= 200) { "Library capacity exceeded" }
-        // First persist the original import. A failure later never destroys its recovery data.
-        Recovery.write(File(context.filesDir, "library-import-source-${System.nanoTime()}.json"), data)
-        archive.backups.forEach { Recovery.write(File(context.filesDir, "backup-imported-${System.nanoTime()}.txt"), it) }
-        archive.audition?.let {
-            // An imported recovery may belong to another device: never activate it automatically.
-            Recovery.write(File(context.filesDir, "backup-imported-audition-${System.nanoTime()}.json"), it.toString())
-        }
-        Recovery.write(customFile, JSONArray(customs.map { it.json() }).toString())
-        customMutable.value = customs
-        persist(list)
-        recoveryMutable.value = readRecoveries()
-        "Importati ${archive.presets.size} preset, ${archive.custom.size} profili custom e ${archive.backups.size} backup; nessuna scrittura USB"
+        store.importArchive(data)
     }.getOrElse { "Importazione fallita: ${it.message}" }
     fun disconnect() {
         running.set(false)
-        runCatching { request?.cancel() }
+        link.cancel()
         worker?.join(1500)
         mutable.update { it.copy(connected=false,synced=false,busy=false,status=T("AMPED 3 scollegata", "AMPED 3 disconnected")) }
     }
     fun close() { disconnect(); if (registered) { context.unregisterReceiver(receiver); registered=false } }
-}
-
-data class LocalPreset(val id:String,val name:String,val amp:List<Int>,val cab:List<Int>, val ampSlot:Int = 0, val dsp:String? = null, val scope:String = "both") {
-    fun json()=JSONObject().put("id",id).put("name",name).put("amp",JSONArray(amp)).put("cab",JSONArray(cab)).put("ampSlot",ampSlot).put("scope",scope).put("dsp",dsp?.let { JSONObject(it) })
-    companion object {
-        fun parseList(s:String):List<LocalPreset> {
-            val a=JSONArray(s);require(a.length()<=1000)
-            return (0 until a.length()).map { i ->
-                val o=a.getJSONObject(i)
-                fun values(key:String,size:Int):List<Int> {val ar=o.getJSONArray(key);require(ar.length()==size);return (0 until size).map { ar.getInt(it).also { n->require(n in 0..255) } }}
-                val scope = o.optString("scope", "both"); require(scope in listOf("both", "amp", "cab"))
-                val slot = o.optInt("ampSlot", 0); require(slot in 0..3)
-                val payload = o.optJSONObject("dsp")?.let { Recovery.validateProfile(it).toString() }
-                LocalPreset(o.getString("id").take(100),o.getString("name").take(60),values("amp",52),values("cab",84),slot,payload,scope)
-            }
-        }
-    }
 }

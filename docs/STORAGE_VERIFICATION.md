@@ -34,8 +34,10 @@ constitute a physical power-cycle test or an Android USB transport test.
 - Respect the observed name capacities (AMP 23, CabRig 21 ASCII characters).
 - Wait for the CabRig AF acknowledgement.
 - Reread name/data after saving. Verify all 84 CabRig bytes; AMP verification
-  currently covers the first nine continuous parameters of the compact
-  15-byte stored format. Do not claim verification of all AMP switches yet.
+  covers all fifteen bytes of the compact stored format, each against its
+  live offset (map in PROTOCOL_VERIFICATION.md, established 2026-09-28 with
+  tools/verify_amp_stored_bytes.py). Power, Master, reverb on/off and the
+  boost bit are not stored in a slot at all.
 - Fail with an explicit unconfirmed-save status if backup, ACK or readback
   fails. A successful resynchronization alone is not a save confirmation.
 

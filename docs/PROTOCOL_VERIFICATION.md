@@ -58,7 +58,29 @@ Writing was then checked on the hardware for every offset a local preset restore
 
 `02 11 <slot>` does load the stored preset. After sending it for slot 2, the live parameters became exactly that slot's stored bytes, while Master stayed where it was because the compact format does not store it. Sending it for slot 1 restored the original state exactly.
 
-The 15-byte stored format decodes as: bytes 0–8 are live offsets 0–8 in order, byte 10 is power, byte 11 is the valve response. That is how a one-byte difference in slot 2 was identified as a change of response from 6L6 to EL34.
+The 15-byte stored format was first read as bytes 0–8 = live offsets 0–8, byte 10 = power, byte 11 = valve response. Half of that was wrong, and it took a real save to find out; see below.
+
+`02 01 <slot>` is the CabRig counterpart, and it was exercised on the hardware during the storage verification of 20 September (`tools/verify_slot_storage.py`, `backups/storage-verification-20260920.json`): each of the three CabRig slots was recalled in turn, and every time the live block matched that slot's stored 84 bytes exactly, 84 of 84, for all three slots.
+
+## Stored AMP format, 28–29 September 2026
+
+`tools/verify_amp_stored_bytes.py` saves the active AMP slot with one live offset changed at a time, rereads the 15-byte record and notes which byte moved, then saves the original back. Every run began with a fresh backup of the live state and all six slots (`backups/amp-stored-bytes-*.json`) and ended with all six slots and the live state byte-identical to it.
+
+| Stored byte | Live offset | Meaning |
+|---|---|---|
+| 0–8 | 0–8 | Gain, Volume, Boost, Reverb, Bass, Middle, Treble, ISF, Presence |
+| 9 | 24 | Boost position |
+| 10 | 25 | Reverb character |
+| 11 | 22 | Valve response |
+| 12 | 26 | Clean voice |
+| 13 | 27 | Crunch voice |
+| 14 | 28 | OD voice |
+
+Master (9), power (21, written 1 → 3 and confirmed live), reverb on/off (33), the boost bit (32) and offsets 23 and 40 moved no stored byte: they are not part of a slot. Byte 10 had been recorded as power because in every earlier sample both power and reverb character were 1; only a save with one of them changed could tell them apart.
+
+**The pedal stores its live state, not the save packet's payload.** Sending `02 13` with the 52 bytes changed in one offset and nothing changed live left the stored record untouched, the gain control included; the same change made live first was stored. The app is unaffected in practice, because it saves a snapshot of the live state under the write gate, but the 52 bytes it sends are not what decides the slot's contents.
+
+The app now verifies an AMP save against all fifteen bytes.
 
 ## Power cycle, 21 September 2026
 
@@ -74,6 +96,12 @@ rate the DSP model assumes. The capture channels do not carry the processed sign
 configuration: a sweep played through the device appeared nowhere, a guitar being played gave a
 level flat to within a decibel, and a gain change from 20 to 127 moved the captured noise by only
 2.6 dB. Measuring the cabinet response needs an interface on the analogue output instead.
+
+## CabRig switches, 28 September 2026
+
+Cabinet solo and mute (offsets 5 and 6), room type, solo, mute and width (56, 58, 59, 60) and the EQ bypass (74) had been mapped from Architect's `.cabrig` files only. `tools/verify_cab_switches.py` wrote each of them on the hardware with the packet the app sends, live state only, after backing up the live block and all six slots (`backups/cab-switches-20260928-2348.json`). Every value the app offers was accepted and read back unchanged: 0/1 on the five switches, room type 0 to 5, width 0 to 2. No other CabRig byte and no amplifier byte moved with any of the writes. The original values were put back, the live state ended byte-identical to the backup and the six stored slots were untouched; no save opcode was sent.
+
+The app also rereads the pedal after every parameter write, EQ preset and local preset, and reports any value that reads back differently instead of taking the write as done; the boost bit is compared on its own, because the rest of offset 32 belongs to the pedal.
 
 ## Still open
 

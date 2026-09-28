@@ -73,9 +73,17 @@ object Recovery {
         return bytes.map { it.toInt() and 255 }
     }
 
-    fun verifyCab(records: Map<String, String>, name: String, expected: List<Int>): Boolean {
-        val n = records.entries.first { it.key.startsWith("4:") }.value
-        val actualName = AmpedProtocol.decodeHex(n).takeWhile { it != 0.toByte() }.toByteArray().toString(Charsets.US_ASCII)
-        return actualName == name && storedCab(records) == expected
+    private fun storedName(records: Map<String, String>, kind: Int): String {
+        val n = records.entries.first { it.key.startsWith("$kind:") }.value
+        return AmpedProtocol.decodeHex(n).takeWhile { it != 0.toByte() }.toByteArray().toString(Charsets.US_ASCII)
+    }
+
+    fun verifyCab(records: Map<String, String>, name: String, expected: List<Int>): Boolean =
+        storedName(records, 4) == name && storedCab(records) == expected
+
+    /** Name plus all fifteen stored AMP bytes, each against its live offset ([AmpedProtocol.ampStoredOffsets]). */
+    fun verifyAmp(records: Map<String, String>, name: String, expectedLive: List<Int>): Boolean {
+        val stored = AmpedProtocol.decodeHex(records.getValue("21:15")).map { it.toInt() and 255 }
+        return storedName(records, 0x14) == name && AmpedProtocol.ampStoredMatches(stored, expectedLive)
     }
 }
