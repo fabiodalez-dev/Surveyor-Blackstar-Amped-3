@@ -38,7 +38,7 @@ Ho creato il progetto Android **Amped 3 Controller** all'interno del tuo workspa
 1. **Come funziona:** l'app cerca via `UsbManager` il dispositivo VID `27d4` / PID `0072`, chiede il permesso, rivendica l'interfaccia HID e interroga la pedaliera con `[07, ...]` per leggerne lo stato completo (52 byte per l'ampli, 84 per il CabRig) prima di mostrare qualsiasi valore.
 2. **Interfaccia (UI):** Jetpack Compose, tema carbone/corallo. Gli slider partono dai valori letti dall'hardware, non da un default: finché la lettura non è arrivata non sono manovrabili.
 3. **Comunicazione:** muovendo uno slider l'app invia un report da 64 byte `[0x16, offset, 0, 1, valore]` (oppure `0xa9` per il CabRig) con padding a zero, e rilegge lo stato per confermare il valore effettivo.
-4. **Nome storico:** il file si chiama ancora `AmpedMidiController.kt`. È un residuo dell'ipotesi MIDI, non una descrizione di cosa fa.
+4. **Nome storico:** il file si chiama ancora `AmpedMidiController.kt`. È un residuo dell'ipotesi MIDI, non una descrizione di cosa fa. Dal 24 settembre contiene solo il protocollo (sincronizzazione, scritture, salvataggi, trasferimenti DSP, recupero della prova): il canale USB è in `UsbHidLink.kt`, i file sul telefono in `LibraryStore.kt`, la conversione IR in `IrConversion.kt`. L'interfaccia è divisa per schermata (`AmpPage.kt`, `CabPage.kt`, `CustomProfileSection.kt`, `PresetsPage.kt`, `AmpedApp.kt`) con i controlli comuni in `UiKit.kt`.
 
 ## Come installare l'APK e testarlo
 La build dell'APK è in esecuzione in background.
@@ -78,4 +78,4 @@ Questa architettura permette di approssimare molto fedelmente le risonanze e la 
 ### Persistenza e Sicurezza
 La procedura di salvataggio nei banchi permanenti è documentata ed è stata esercitata sull'hardware dal lato Mac: backup dei sei slot, scrittura, richiamo di un altro slot, richiamo del banco scritto, confronto e ripristino byte per byte (vedi [STORAGE_VERIFICATION.md](STORAGE_VERIFICATION.md)). Su Android la sequenza fa lettura pre-salvataggio, fsync del backup locale, attesa dell'ACK, rilettura e confronto di nome e dati, e dichiara un esito **non confermato** se uno di questi passi fallisce.
 
-Il rischio non è «ridotto a zero» e scriverlo sarebbe falso: la verifica AMP copre i primi nove parametri continui del formato compatto da 15 byte, non tutti gli interruttori, e mancano ancora la prova di ritenzione dopo spegnimento fisico e un salvataggio completo fatto da Android. Fino ad allora vale la regola operativa: backup prima di ogni scrittura, e un backup fallito ferma la scrittura.
+Il rischio non è «ridotto a zero» e scriverlo sarebbe falso: la verifica AMP copre ora tutti i 15 byte del formato compatto (mappati sull'hardware il 28 settembre), ma mancano ancora la prova di ritenzione dopo spegnimento fisico e un salvataggio completo fatto da Android. Fino ad allora vale la regola operativa: backup prima di ogni scrittura, e un backup fallito ferma la scrittura.

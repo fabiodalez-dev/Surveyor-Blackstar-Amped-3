@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<Sound FirmwareVersion="3">
+  <Info>
+    <Name>Review AMP backup 20260921</Name>
+    <Creator>Architect</Creator>
+    <Genre>3</Genre>
+    <SubGenre>3</SubGenre>
+    <SearchTags></SearchTags>
+    <About></About>
+  </Info>
+  <Amplifier>
+    <Gain>85</Gain>
+    <Volume>127</Volume>
+    <Boost>70</Boost>
+    <Reverb>74</Reverb>
+    <Presence>60</Presence>
+    <Bass>49</Bass>
+    <Middle>67</Middle>
+    <Treble>27</Treble>
+    <ISF>81</ISF>
+  </Amplifier>
+  <Switches>
+    <TogglesSwitches>
+      <Impulse>0</Impulse>
+      <Power>1</Power>
+      <Response>2</Response>
+      <CabRig>2</CabRig>
+      <PrePost>0</PrePost>
+      <DarkLight>1</DarkLight>
+      <Clean>0</Clean>
+      <Crunch>0</Crunch>
+      <Drive>0</Drive>
+      <Boost>0</Boost>
+      <Reverb>0</Reverb>
+    </TogglesSwitches>
+    <FootSwitches>
+      <FSBankOne>32</FSBankOne>
+      <FSBankTwo>1</FSBankTwo>
+    </FootSwitches>
+  </Switches>
+  <Miscellaneous>
+    <Voice>2</Voice>
+  </Miscellaneous>
+</Sound>

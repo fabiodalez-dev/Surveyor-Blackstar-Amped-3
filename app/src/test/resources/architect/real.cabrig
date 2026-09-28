@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<Sound CE="1" CS="1" LastModified="21/09/2026 19:18:26" FirmwareVersion="1">
+  <Info>
+    <Name>Review CAB backup 20260921</Name>
+    <Creator>Architect</Creator>
+    <Genre>3</Genre>
+    <SubGenre>3</SubGenre>
+    <SearchTags></SearchTags>
+    <About></About>
+  </Info>
+  <Channels>
+    <Channel_One>
+      <Cab_One>16</Cab_One>
+      <Mic_One>0</Mic_One>
+      <Axis_One>1</Axis_One>
+      <Level_One>77</Level_One>
+      <Solo_One>0</Solo_One>
+      <Mute_One>0</Mute_One>
+      <PreAmp_Drive>127</PreAmp_Drive>
+    </Channel_One>
+    <Master>
+      <Level_Master>105</Level_Master>
+    </Master>
+  </Channels>
+  <Room>
+    <Room_Type>1</Room_Type>
+    <Room_Level>71</Room_Level>
+    <Room_Solo>0</Room_Solo>
+    <Room_Mute>0</Room_Mute>
+    <Room_Width>1</Room_Width>
+  </Room>
+  <EQs>
+    <EQ_Master>
+      <EQ_Master_Bypass>0</EQ_Master_Bypass>
+      <EQ_Master_Low>89</EQ_Master_Low>
+      <EQ_Master_LowMid>123</EQ_Master_LowMid>
+      <EQ_Master_HighMid>155</EQ_Master_HighMid>
+      <EQ_Master_High>157</EQ_Master_High>
+      <EQ_Master_LowCut>96</EQ_Master_LowCut>
+      <EQ_Master_HighCut>95</EQ_Master_HighCut>
+      <EQ_Master_LowCutToggle>1</EQ_Master_LowCutToggle>
+      <EQ_Master_HighCutToggle>1</EQ_Master_HighCutToggle>
+    </EQ_Master>
+  </EQs>
+</Sound>
