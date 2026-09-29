@@ -329,6 +329,7 @@ class AmpedMidiController(private val context: Context) {
     }
     fun applyLocal(p: LocalPreset) {
         val coeff = p.dsp?.let { JSONObject(it) } ?: profiles.find(p.cab[0],p.cab[1],p.cab[2]) ?: return
+        if (p.scope != "amp" && refusesPayload(coeff)) return
         val ampOffsets = listOf(0,1,2,3,4,5,6,7,8,22,24,25,26,27,28,33)
         val expectedAmp = if (p.scope != "cab") ampOffsets.associateWith { p.amp[it] } + (AmpedProtocol.AMP_STATUS to p.amp[AmpedProtocol.AMP_STATUS]) else emptyMap()
         val expectedCab = if (p.scope != "amp") AmpedProtocol.cabPresetOffsets.associateWith { p.cab[it] } else emptyMap()
@@ -395,8 +396,24 @@ class AmpedMidiController(private val context: Context) {
      * when the profile was made. A stored verdict says what was true of some earlier version of
      * the code; this says what is true of these coefficients now.
      */
-    private fun refuses(custom: CustomProfile): Boolean {
-        val values = com.example.amped3controller.dsp.CabProfile.decode(custom.header, custom.chunks)
+    private fun refuses(custom: CustomProfile): Boolean = refuses(custom.header, custom.chunks)
+
+    /**
+     * A payload from a local preset or an imported recovery file. Byte-identical to a factory
+     * profile it goes out as it is; anything else has to pass the same checks as a custom profile,
+     * so an imported archive is not a way around them.
+     */
+    private fun refusesPayload(dsp: JSONObject): Boolean {
+        val header = dsp.optString("header")
+        val array = dsp.optJSONArray("chunks") ?: return refuses(header, emptyList())
+        val factory = profiles.find(dsp.optInt("cab", -1), dsp.optInt("mic", -1), dsp.optInt("axis", -1))
+        if (factory != null && factory.getString("header") == header &&
+            factory.getJSONArray("chunks").toString() == array.toString()) return false
+        return refuses(header, (0 until array.length()).map { array.getString(it) })
+    }
+
+    private fun refuses(header: String, chunks: List<String>): Boolean {
+        val values = com.example.amped3controller.dsp.CabProfile.decode(header, chunks)
         val verdict = if (values == null) null else com.example.amped3controller.dsp.SafetyCheck.verify(values)
         if (verdict != null && verdict.passed) return false
         val reason = verdict?.summary ?: T("profilo illeggibile", "unreadable profile")
