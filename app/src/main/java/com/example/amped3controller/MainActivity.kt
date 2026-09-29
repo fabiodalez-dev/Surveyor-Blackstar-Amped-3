@@ -45,16 +45,15 @@ class MainActivity : ComponentActivity() {
     }
     override fun onCreate(savedInstanceState:Bundle?){
         super.onCreate(savedInstanceState);enableEdgeToEdge()
-        controller=ViewModelProvider(this)[ControllerModel::class.java].controller
+        val model=ViewModelProvider(this)[ControllerModel::class.java]
+        controller=model.controller
         setContent {
             MaterialTheme(colorScheme=darkColorScheme(primary=Red,onPrimary=Coal,background=Coal,surface=Coal,surfaceVariant=Panel,onSurface=Paper,onSurfaceVariant=Muted,secondary=Red)) {
                 AmpedApp(controller,notice,{export.launch("Amped3-preset-e-backup.json")},{import.launch(arrayOf("application/json","text/plain","text/xml","application/xml","*/*"))},{importIr.launch(arrayOf("audio/wav","audio/x-wav","application/octet-stream","*/*"))})
             }
         }
         val debug = (applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0
-        if (savedInstanceState == null) {
-            if (debug && intent?.getBooleanExtra("demo", false) == true) controller.enableDemo() else controller.connectToAmp()
-        }
+        model.startOnce { if (debug && intent?.getBooleanExtra("demo", false) == true) it.enableDemo() else it.connectToAmp() }
         // debug-only hook so the conversion path can be exercised without driving the file picker:
         //   adb shell am start ... --ez demo true --es ir /sdcard/Download/some.wav
         if (debug && savedInstanceState == null) intent?.getStringExtra("ir")?.let { path ->
