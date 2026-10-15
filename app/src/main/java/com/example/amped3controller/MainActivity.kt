@@ -39,22 +39,50 @@ class MainActivity : ComponentActivity() {
                     contentResolver.openInputStream(uri)!!.use { Recovery.readLimited(it, 16*1024*1024) }
                 }
                 val name=uri.lastPathSegment?.substringAfterLast('/')?.take(80) ?: "impulse.wav"
-                controller.convertIr(bytes,name)
+                controller.convertIr(bytes,name,controller.irOptions.value)
             }.onFailure { notice=it.message ?: "Import failed" }
+        }
+    }
+    private val importIrs=registerForActivityResult(ActivityResultContracts.OpenMultipleDocuments()){uris ->
+        if(uris.isNotEmpty()) lifecycleScope.launch {
+            runCatching {
+                val files = withContext(Dispatchers.IO) {
+                    uris.take(40).map { uri ->
+                        contentResolver.openInputStream(uri)!!.use { Recovery.readLimited(it, 16*1024*1024) } to
+                            (uri.lastPathSegment?.substringAfterLast('/')?.take(80) ?: "impulse.wav")
+                    }
+                }
+                controller.convertBatch(files, controller.irOptions.value)
+            }.onFailure { notice=it.message ?: "Import failed" }
+        }
+    }
+    private var profileToExport: String? = null
+    private val exportProfile=registerForActivityResult(ActivityResultContracts.CreateDocument("application/json")){ uri ->
+        val id = profileToExport
+        if(uri!=null && id!=null) lifecycleScope.launch {
+            notice = runCatching { withContext(Dispatchers.IO) {
+                val text = controller.exportCustom(id) ?: error("profile not found")
+                contentResolver.openOutputStream(uri)!!.bufferedWriter().use { it.write(text) }
+            }; T("Profilo esportato", "Profile exported") }.getOrElse { "Export: ${it.message}" }
         }
     }
     override fun onCreate(savedInstanceState:Bundle?){
         super.onCreate(savedInstanceState);enableEdgeToEdge()
-        controller=ViewModelProvider(this)[ControllerModel::class.java].controller
+        val model=ViewModelProvider(this)[ControllerModel::class.java]
+        controller=model.controller
         setContent {
             MaterialTheme(colorScheme=darkColorScheme(primary=Red,onPrimary=Coal,background=Coal,surface=Coal,surfaceVariant=Panel,onSurface=Paper,onSurfaceVariant=Muted,secondary=Red)) {
-                AmpedApp(controller,notice,{export.launch("Amped3-preset-e-backup.json")},{import.launch(arrayOf("application/json","text/plain","text/xml","application/xml","*/*"))},{importIr.launch(arrayOf("audio/wav","audio/x-wav","application/octet-stream","*/*"))})
+                val wav = arrayOf("audio/wav","audio/x-wav","application/octet-stream","*/*")
+                AmpedApp(controller,notice,UiActions(
+                    export={export.launch("Amped3-preset-e-backup.json")},
+                    import={import.launch(arrayOf("application/json","text/plain","text/xml","application/xml","*/*"))},
+                    importIr={importIr.launch(wav)},
+                    importIrs={importIrs.launch(wav)},
+                    exportProfile={ p -> profileToExport = p.id; exportProfile.launch("${p.name.replace(Regex("[^A-Za-z0-9 _-]"),"")}.cab.json") }))
             }
         }
         val debug = (applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0
-        if (savedInstanceState == null) {
-            if (debug && intent?.getBooleanExtra("demo", false) == true) controller.enableDemo() else controller.connectToAmp()
-        }
+        model.startOnce { if (debug && intent?.getBooleanExtra("demo", false) == true) it.enableDemo() else it.connectToAmp() }
         // debug-only hook so the conversion path can be exercised without driving the file picker:
         //   adb shell am start ... --ez demo true --es ir /sdcard/Download/some.wav
         if (debug && savedInstanceState == null) intent?.getStringExtra("ir")?.let { path ->

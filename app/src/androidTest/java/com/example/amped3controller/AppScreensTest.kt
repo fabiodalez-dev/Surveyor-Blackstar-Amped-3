@@ -76,6 +76,42 @@ class DemoScreensTest {
         rule.onNodeWithText("Save to slot 1").performScrollTo().assertIsEnabled()
     }
 
+    @Test fun cabPageOffersCurvesComparisonsAndFilters() {
+        rule.onNodeWithText("CabRig").performClick()
+        rule.onNodeWithText("Against another").performScrollTo().performClick()
+        rule.onNodeWithText("Distance between the two:", substring = true).assertExists()
+        rule.onNodeWithText("All 6 mics").performClick()
+        rule.onNodeWithText("■ 57 Dyn", substring = true).assertExists()
+        rule.onNodeWithText("Similar:", substring = true).assertExists()
+        rule.onNodeWithText("4x").performScrollTo().performClick()
+        rule.onNodeWithTag("cabinet-selector").assertTextContains("(8)", substring = true)
+        rule.onNodeWithTag("cabinet-selector").performClick()
+        rule.onNodeWithText("4x12 Modern UK Neo").assertExists()
+        rule.onNodeWithText("1x10 Classic USA Combo").assertDoesNotExist()
+    }
+
+    @Test fun favouriteCabinetAppearsAsAChip() {
+        rule.onNodeWithText("CabRig").performClick()
+        rule.onNodeWithTag("favorite-cabinet").performScrollTo().performClick()
+        rule.waitUntil(5_000) { rule.onAllNodesWithText("★ 4x12 Classic UK · 160 Rib · Off").fetchSemanticsNodes().size == 1 }
+        rule.onNodeWithTag("favorite-cabinet").performScrollTo().performClick()
+        rule.waitUntil(5_000) { rule.onAllNodesWithText("★ 4x12 Classic UK · 160 Rib · Off").fetchSemanticsNodes().isEmpty() }
+    }
+
+    @Test fun extraCabinetsAndLabAreListed() {
+        rule.onNodeWithText("CabRig").performClick()
+        rule.onNodeWithText("EXTRA CABINETS").performScrollTo().assertExists()
+        rule.onNodeWithText("real cabinets fitted from impulse responses", substring = true).assertExists()
+        rule.onNodeWithTag("library-search").performScrollTo().assertExists()
+        rule.onAllNodesWithText("Marshall (", substring = true)[0].performScrollTo().performClick()
+        rule.onNodeWithText("classic rock").performScrollTo().performClick()
+        rule.onAllNodesWithText("Marshall 1960AX Greenback", substring = true)[0].performScrollTo().assertExists()
+        rule.onNodeWithText("CABINET LAB").performScrollTo().assertExists()
+        rule.onNodeWithText("Build and check").performScrollTo().assertIsNotEnabled()
+        rule.onNodeWithTag("lab-name").performScrollTo().performTextInput("my blend")
+        rule.onNodeWithText("Build and check").performScrollTo().assertIsEnabled()
+    }
+
     @Test fun cabPageShowsTheLoadedCabinetAndCalibratedLevels() {
         rule.onNodeWithText("CabRig").performClick()
         rule.onAllNodesWithText("4x12 Classic UK")[0].assertExists()

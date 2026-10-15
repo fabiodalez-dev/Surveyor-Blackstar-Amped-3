@@ -80,6 +80,50 @@ class LibraryStore(private val dir: File, private val log: (String) -> Unit) {
         runCatching { persistCustom(customMutable.value.filterNot { it.id == id }) }
     }
 
+    /** Changes one profile in place: name, notes, favourite. The payload is never touched here. */
+    @Synchronized fun updateCustom(id: String, change: (CustomProfile) -> CustomProfile) {
+        runCatching { persistCustom(customMutable.value.map { if (it.id == id) change(it) else it }) }
+    }
+
+    @Synchronized fun duplicateCustom(id: String): String? {
+        val original = customMutable.value.firstOrNull { it.id == id } ?: return null
+        val copy = original.copy(id = System.currentTimeMillis().toString(), name = (original.name + " copy").take(60),
+            created = System.currentTimeMillis(), favorite = false)
+        return addCustom(copy)
+    }
+
+    // --- cabinet preferences: favourites and recents ----------------------------------------
+
+    private val prefsFile = File(dir, "cabinet_prefs.json")
+    private val prefsMutable = MutableStateFlow(readPrefs())
+    /** Favourite factory keys ("cab:mic:axis") and the last ones loaded, most recent first. */
+    val cabinetPrefs = prefsMutable.asStateFlow()
+
+    data class CabinetPrefs(val favorites: List<String> = emptyList(), val recents: List<String> = emptyList())
+
+    private fun readPrefs(): CabinetPrefs = runCatching {
+        if (!prefsFile.exists()) return CabinetPrefs()
+        val o = JSONObject(prefsFile.readText())
+        fun list(key: String) = (o.optJSONArray(key) ?: JSONArray()).let { a -> (0 until a.length()).map { a.getString(it) } }
+            .filter { Regex("""\d{1,2}:\d:[01]""").matches(it) }
+        CabinetPrefs(list("favorites").take(50), list("recents").take(10))
+    }.getOrDefault(CabinetPrefs())
+
+    @Synchronized private fun persistPrefs(p: CabinetPrefs) {
+        Recovery.write(prefsFile, JSONObject().put("favorites", JSONArray(p.favorites)).put("recents", JSONArray(p.recents)).toString())
+        prefsMutable.value = p
+    }
+
+    fun toggleFavorite(key: String) {
+        val p = prefsMutable.value
+        persistPrefs(p.copy(favorites = if (key in p.favorites) p.favorites - key else (p.favorites + key).takeLast(50)))
+    }
+
+    fun noteRecent(key: String) {
+        val p = prefsMutable.value
+        persistPrefs(p.copy(recents = (listOf(key) + p.recents.filter { it != key }).take(8)))
+    }
+
     /** Writes a backup and reads it back, so a failed disk write stops the caller before the pedal is touched. */
     fun writeBackup(prefix: String, root: JSONObject): File {
         val file = File(dir, "$prefix-${System.nanoTime()}.json")
@@ -121,6 +165,10 @@ class LibraryStore(private val dir: File, private val log: (String) -> Unit) {
     }
 
     @Synchronized fun importPreset(p: LocalPreset) = persistPresets((presetsMutable.value + p).distinctBy { it.id })
+
+    /** A single shared profile. A new id is given, so the same file can be imported twice. */
+    @Synchronized fun importCustom(p: CustomProfile): String? =
+        addCustom(p.copy(id = System.currentTimeMillis().toString(), favorite = false))
 
     @Synchronized fun importArchive(data: String): String {
         val archive = LibraryArchive.parse(data)

@@ -43,6 +43,14 @@ class AmpedMidiController(private val context: Context) {
     val presets = store.presets
     val customProfiles = store.customProfiles
     val recoveries = store.recoveries
+    val cabinetPrefs = store.cabinetPrefs
+    /** The factory library, for curves and the lab. */
+    val factory: FactoryProfiles get() = profiles
+    /** Cabinets shipped with the app beyond the factory ones, fitted from licensed IRs or designed. */
+    val builtin: List<LibraryCab> by lazy {
+        runCatching { LibraryCab.parseList(context.assets.open("cab_library.json").bufferedReader().use { it.readText() }) }
+            .getOrElse { log("Libreria casse non leggibile: ${it.message}"); emptyList() }
+    }
 
     private val conversionMutable = MutableStateFlow<Conversion?>(null)
     val conversion = conversionMutable.asStateFlow()
@@ -211,8 +219,9 @@ class AmpedMidiController(private val context: Context) {
     }
     fun chooseCab(cab: Int, mic: Int, axis: Int) {
         val p = profiles.find(cab,mic,axis) ?: return
-        enqueue("Caricamento CabRig…") { transfer(p) }
+        enqueue("Caricamento CabRig…") { transfer(p); store.noteRecent(FactoryProfiles.key(cab, mic, axis)) }
     }
+    fun toggleFavoriteCabinet(key: String) = store.toggleFavorite(key)
     fun applyEqPreset(name: String) {
         val preset = AmpedProtocol.eqPresets[name] ?: return
         enqueue("Equalizzazione…", afterSync = { requireAccepted(emptyMap(), preset) }) {
@@ -329,6 +338,7 @@ class AmpedMidiController(private val context: Context) {
     }
     fun applyLocal(p: LocalPreset) {
         val coeff = p.dsp?.let { JSONObject(it) } ?: profiles.find(p.cab[0],p.cab[1],p.cab[2]) ?: return
+        if (p.scope != "amp" && refusesPayload(coeff)) return
         val ampOffsets = listOf(0,1,2,3,4,5,6,7,8,22,24,25,26,27,28,33)
         val expectedAmp = if (p.scope != "cab") ampOffsets.associateWith { p.amp[it] } + (AmpedProtocol.AMP_STATUS to p.amp[AmpedProtocol.AMP_STATUS]) else emptyMap()
         val expectedCab = if (p.scope != "amp") AmpedProtocol.cabPresetOffsets.associateWith { p.cab[it] } else emptyMap()
@@ -368,13 +378,26 @@ class AmpedMidiController(private val context: Context) {
 
     // --- impulse response conversion -----------------------------------------------------
 
-    /** Runs [IrConversion] off the USB queue: it must not wait behind hardware commands, and it
+    /** The last WAV picked, kept so it can be fitted again with other options without the picker. */
+    private var lastIr: Pair<ByteArray, String>? = null
+    val lastIrName: String? get() = lastIr?.second
+
+    /** Options the next WAV will be fitted with; the picker in MainActivity reads them. */
+    val irOptions = MutableStateFlow(IrOptions())
+    /** A recipe the user asked to edit again, picked up by the lab. */
+    val labRecipe = MutableStateFlow<Recipe?>(null)
+
+    private val batchMutable = MutableStateFlow<List<String>>(emptyList())
+    /** One line per file of the last batch conversion. */
+    val batchReport = batchMutable.asStateFlow()
+
+    /** Runs the arithmetic off the USB queue: it must not wait behind hardware commands, and it
      *  has to work with no pedal attached. The result is never sent anywhere until the user asks. */
-    fun convertIr(bytes: ByteArray, source: String) {
+    private fun compute(label: String, work: () -> Conversion) {
         if (!operation.begin()) return
-        mutable.update { it.copy(busy = true, status = T("Conversione della risposta…", "Converting the impulse response…")) }
+        mutable.update { it.copy(busy = true, status = label) }
         Thread {
-            val outcome = runCatching { IrConversion.convert(bytes, source, state.value.cab, profiles) }
+            val outcome = runCatching(work)
             operation.end()
             outcome.onSuccess { c ->
                 conversionMutable.value = c
@@ -388,6 +411,50 @@ class AmpedMidiController(private val context: Context) {
         }.also { it.isDaemon = true; it.start() }
     }
 
+    fun convertIr(bytes: ByteArray, source: String, options: IrOptions = IrOptions()) {
+        lastIr = bytes to source
+        compute(T("Conversione della risposta…", "Converting the impulse response…")) {
+            IrConversion.convert(bytes, source, state.value.cab, profiles, options)
+        }
+    }
+
+    /** The same WAV again with different options: channel, length, pole bank. */
+    fun reconvertIr(options: IrOptions) {
+        val (bytes, source) = lastIr ?: return
+        convertIr(bytes, source, options)
+    }
+
+    /** A cabinet from the lab: blend, shape, or both. */
+    fun design(recipe: Recipe, name: String) {
+        compute(T("Costruzione della cassa…", "Building the cabinet…")) { IrConversion.design(recipe, name, profiles) }
+    }
+
+    /** Several WAVs in one go, each saved under its file name when it passes. Nothing is sent. */
+    fun convertBatch(files: List<Pair<ByteArray, String>>, options: IrOptions = IrOptions()) {
+        if (files.isEmpty() || !operation.begin()) return
+        mutable.update { it.copy(busy = true, status = T("Conversione di ${files.size} file…", "Converting ${files.size} files…")) }
+        batchMutable.value = emptyList()
+        Thread {
+            val report = ArrayList<String>()
+            for ((bytes, source) in files) {
+                val line = runCatching { IrConversion.convert(bytes, source, state.value.cab, profiles, options) }.fold({ c ->
+                    if (!c.verdict.passed) "✗ $source: ${c.verdict.summary}"
+                    else {
+                        val entry = CustomProfile(System.currentTimeMillis().toString() + report.size, source.removeSuffix(".wav").take(60),
+                            System.currentTimeMillis(), source, c.templateKey, c.cab, c.mic, c.axis, c.header, c.chunks,
+                            c.errorDb, c.attenuatedDb, true)
+                        store.addCustom(entry)?.let { "✗ $source: $it" } ?: "✓ $source · %.2f dB · ${c.templateKey}".format(java.util.Locale.US, c.errorDb)
+                    }
+                }, { e -> "✗ $source: ${e.message}" })
+                report += line
+                batchMutable.value = report.toList()
+            }
+            operation.end()
+            mutable.update { it.copy(busy = false, status = T("Lotto concluso: ${report.count { it.startsWith("✓") }}/${files.size} salvati",
+                "Batch done: ${report.count { it.startsWith("✓") }}/${files.size} saved")) }
+        }.also { it.isDaemon = true; it.start() }
+    }
+
     fun discardConversion() { conversionMutable.value = null }
 
     /**
@@ -395,8 +462,24 @@ class AmpedMidiController(private val context: Context) {
      * when the profile was made. A stored verdict says what was true of some earlier version of
      * the code; this says what is true of these coefficients now.
      */
-    private fun refuses(custom: CustomProfile): Boolean {
-        val values = com.example.amped3controller.dsp.CabProfile.decode(custom.header, custom.chunks)
+    private fun refuses(custom: CustomProfile): Boolean = refuses(custom.header, custom.chunks)
+
+    /**
+     * A payload from a local preset or an imported recovery file. Byte-identical to a factory
+     * profile it goes out as it is; anything else has to pass the same checks as a custom profile,
+     * so an imported archive is not a way around them.
+     */
+    private fun refusesPayload(dsp: JSONObject): Boolean {
+        val header = dsp.optString("header")
+        val array = dsp.optJSONArray("chunks") ?: return refuses(header, emptyList())
+        val factory = profiles.find(dsp.optInt("cab", -1), dsp.optInt("mic", -1), dsp.optInt("axis", -1))
+        if (factory != null && factory.getString("header") == header &&
+            factory.getJSONArray("chunks").toString() == array.toString()) return false
+        return refuses(header, (0 until array.length()).map { array.getString(it) })
+    }
+
+    private fun refuses(header: String, chunks: List<String>): Boolean {
+        val values = com.example.amped3controller.dsp.CabProfile.decode(header, chunks)
         val verdict = if (values == null) null else com.example.amped3controller.dsp.SafetyCheck.verify(values)
         if (verdict != null && verdict.passed) return false
         val reason = verdict?.summary ?: T("profilo illeggibile", "unreadable profile")
@@ -410,11 +493,18 @@ class AmpedMidiController(private val context: Context) {
         if (name.isBlank()) return
         val entry = CustomProfile(System.currentTimeMillis().toString(), name.trim().take(60),
             System.currentTimeMillis(), c.source, c.templateKey, c.cab, c.mic, c.axis,
-            c.header, c.chunks, c.errorDb, c.attenuatedDb, c.verdict.passed)
+            c.header, c.chunks, c.errorDb, c.attenuatedDb, c.verdict.passed, c.recipe)
         store.addCustom(entry)?.let { reason -> mutable.update { it.copy(status = reason) } }
     }
 
     fun deleteCustom(id: String) = store.deleteCustom(id)
+    fun renameCustom(id: String, name: String) { if (name.isNotBlank()) store.updateCustom(id) { it.copy(name = name.trim().take(60)) } }
+    fun annotateCustom(id: String, notes: String) = store.updateCustom(id) { it.copy(notes = notes.take(500)) }
+    fun toggleFavoriteCustom(id: String) = store.updateCustom(id) { it.copy(favorite = !it.favorite) }
+    fun duplicateCustom(id: String) { store.duplicateCustom(id)?.let { reason -> mutable.update { it.copy(status = reason) } } }
+    /** A shipped cabinet copied into the user's own list, where it can be renamed, noted and edited. */
+    fun adoptBuiltin(cab: LibraryCab) { store.importCustom(cab.toCustomProfile())?.let { reason -> mutable.update { it.copy(status = reason) } } }
+    fun exportCustom(id: String): String? = (customProfiles.value.firstOrNull { it.id == id } ?: builtin.firstOrNull { "lib:${it.id}" == id }?.toCustomProfile())?.exportJson()
 
     /**
      * Loads a profile into the live DSP for listening. Before anything goes out, the current live
@@ -493,6 +583,10 @@ class AmpedMidiController(private val context: Context) {
             if (p.scope == "cab") p = p.copy(dsp = profiles.find(p.cab[0],p.cab[1],p.cab[2])!!.toString())
             store.importPreset(p)
             return "Importato preset Architect ${p.scope}: ${p.name} (casse originali)"
+        }
+        CustomProfile.parseExport(data)?.let { p ->
+            Recovery.validateProfile(p.transferJson())
+            return store.importCustom(p)?.let { "Importazione fallita: $it" } ?: "Importato profilo custom: ${p.name}; nessuna scrittura USB"
         }
         store.importArchive(data)
     }.getOrElse { "Importazione fallita: ${it.message}" }

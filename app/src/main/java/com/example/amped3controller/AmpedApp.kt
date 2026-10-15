@@ -60,7 +60,11 @@ import kotlinx.coroutines.delay
     }
 }
 
-@Composable fun AmpedApp(c:AmpedMidiController,notice:String,onExport:()->Unit,onImport:()->Unit,onImportIr:()->Unit){
+/** What the screens can ask the activity to do: file pickers and document writers. */
+class UiActions(val export:()->Unit={}, val import:()->Unit={}, val importIr:()->Unit={}, val importIrs:()->Unit={}, val exportProfile:(CustomProfile)->Unit={})
+
+@Composable fun AmpedApp(c:AmpedMidiController,notice:String,actions:UiActions){
+    val onExport=actions.export; val onImport=actions.import
     val s by c.state.collectAsState()
     val presets by c.presets.collectAsState()
     var tab by remember {mutableIntStateOf(0)}
@@ -103,7 +107,7 @@ import kotlinx.coroutines.delay
             Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){
                 when(tab){
                     0->AmpPage(s,c)
-                    1->CabPage(s,c,onImportIr)
+                    1->CabPage(s,c,actions)
                     2->PresetsPage(s,c,presets,onExport,onImport)
                     3->{
                         Heading(T("Impostazioni", "Settings"),T("Sistema e diagnostica", "System and Diagnostics"))
