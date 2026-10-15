@@ -105,7 +105,7 @@ class LibraryStore(private val dir: File, private val log: (String) -> Unit) {
         if (!prefsFile.exists()) return CabinetPrefs()
         val o = JSONObject(prefsFile.readText())
         fun list(key: String) = (o.optJSONArray(key) ?: JSONArray()).let { a -> (0 until a.length()).map { a.getString(it) } }
-            .filter { Regex("""\d{1,2}:\d:[01]""").matches(it) }
+            .filter { Regex("""(1?\d|2[0-3]):[0-5]:[01]""").matches(it) }
         CabinetPrefs(list("favorites").take(50), list("recents").take(10))
     }.getOrDefault(CabinetPrefs())
 

@@ -55,6 +55,17 @@ object CabProfile {
         return if (stated == crc16(payload)) payload else null
     }
 
+    /**
+     * Bytes 6..11 of the 0xAA header payload. What they mean is not known, and every one of the
+     * 288 factory profiles carries exactly these, so a header with anything else there is never
+     * sent: a shared profile file must not be a way to hand the firmware metadata it has never
+     * received from Architect.
+     */
+    private val HEADER_TAIL = byteArrayOf(1, 0, 0, 0, 0x0a, 0x14)
+
+    fun knownHeaderTail(header: String): Boolean =
+        unwrap(header, 0xaa)?.let { it.size == 12 && it.copyOfRange(6, 12).contentEquals(HEADER_TAIL) } ?: false
+
     /** The 65 coefficients of a profile, or null if header, chunks or either CRC layer disagree. */
     fun decode(header: String, chunks: List<String>): FloatArray? {
         val head = unwrap(header, 0xaa) ?: return null

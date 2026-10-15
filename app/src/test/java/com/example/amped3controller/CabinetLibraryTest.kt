@@ -94,6 +94,29 @@ class CabinetLibraryTest {
 
     @Test(expected = IllegalArgumentException::class) fun recipeWithoutSourceIsRefused() { Recipe.parse(JSONObject().put("b", "1:0:0")) }
 
+    @Test fun recipeKeysOutsideTheFactoryMatrixAreRefused() {
+        for (bad in listOf("24:0:0", "99:0:0", "3:6:0", "3:0:2")) {
+            assertNull(bad, Recipe.parse(JSONObject().put("a", "21:0:0").put("b", bad)).b)
+            assertThrows(IllegalArgumentException::class.java) { Recipe.parse(JSONObject().put("a", bad)) }
+        }
+        assertEquals("23:5:1", Recipe.parse(JSONObject().put("a", "23:5:1")).a)
+    }
+
+    @Test fun headerMetadataMustBeTheFactoryOne() {
+        val lib = LibraryCab.parseList(File("src/main/assets/cab_library.json").readText())
+        for (key in profiles.keys) assertTrue(key, CabProfile.knownHeaderTail(profiles.header(key)))
+        for (cab in lib) assertTrue(cab.id, CabProfile.knownHeaderTail(cab.header))
+
+        // the same payload, its CRC rebuilt, with one metadata byte changed: still decodes, never sent
+        val p = lib.first().toCustomProfile()
+        val payload = CabProfile.unwrap(p.header, 0xaa)!!.copyOf().also { it[10] = 0x0b }
+        val altered = p.copy(header = CabProfile.bytesToHex(CabProfile.report(0xaa, payload)))
+        assertNotNull(CabProfile.decode(altered.header, altered.chunks))
+        assertFalse(CabProfile.knownHeaderTail(altered.header))
+        assertThrows(IllegalArgumentException::class.java) { Recovery.validateProfile(altered.transferJson()) }
+        assertNotNull(CustomProfile.parseExport(altered.exportJson()))   // readable, but import validates it
+    }
+
     @Test fun customProfileKeepsRecipeNotesAndFavourite() {
         val cab = LibraryCab.parseList(File("src/main/assets/cab_library.json").readText()).first { !it.captured }
         val p = cab.toCustomProfile().copy(notes = "for the ballad", favorite = true)

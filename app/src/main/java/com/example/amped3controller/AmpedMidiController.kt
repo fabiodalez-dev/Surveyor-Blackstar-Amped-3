@@ -479,10 +479,12 @@ class AmpedMidiController(private val context: Context) {
     }
 
     private fun refuses(header: String, chunks: List<String>): Boolean {
+        val known = com.example.amped3controller.dsp.CabProfile.knownHeaderTail(header)
         val values = com.example.amped3controller.dsp.CabProfile.decode(header, chunks)
         val verdict = if (values == null) null else com.example.amped3controller.dsp.SafetyCheck.verify(values)
-        if (verdict != null && verdict.passed) return false
-        val reason = verdict?.summary ?: T("profilo illeggibile", "unreadable profile")
+        if (known && verdict != null && verdict.passed) return false
+        val reason = if (!known) T("intestazione con metadati sconosciuti", "header carries unknown metadata")
+            else verdict?.summary ?: T("profilo illeggibile", "unreadable profile")
         mutable.update { it.copy(busy = false, status =
             T("Non inviato, i controlli lo rifiutano: $reason", "Not sent, the checks refuse it: $reason")) }
         return true
