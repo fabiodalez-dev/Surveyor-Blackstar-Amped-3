@@ -173,6 +173,8 @@ object AmpedProtocol {
         return Chunk(command == 0xa9, offset, report.copyOfRange(4, 4 + count).map { it.toInt() and 255 })
     }
     data class Chunk(val cab: Boolean, val offset: Int, val values: List<Int>)
+    val micNames = listOf("57 Dynamic", "421 Dynamic", "67 Condenser", "414 Condenser", "121 Ribbon", "160 Ribbon")
+    val micShortNames = listOf("57 Dyn", "421 Dyn", "67 Cond", "414 Cond", "121 Rib", "160 Rib")
     val cabinetNames = listOf("DI", "1x10 Classic USA Combo", "1x12 Vintage USA Alnico Combo", "1x12 Vintage USA Ceramic Combo", "1x12 Classic USA Alnico Combo", "1x12 Classic USA Ceramic Combo", "1x12 Modern USA Combo", "1x12 Classic USA Open Back", "2x10 Classic USA Combo", "2x12 Vintage USA Combo", "2x12 Modern USA Combo", "2x12 Vintage Closed Back", "2x12 Classic UK Combo", "2x12 Classic USA Open Back", "2x12 Classic USA Closed Back", "2x12 Vintage Stack", "4x10 Vintage USA Open Back", "4x12 Vintage Oversized UK", "4x12 Vintage UK", "4x12 Modern UK", "4x12 Classic UK", "4x12 Modern USA", "4x12 Modern UK Ceramic", "4x12 Modern UK Neo")
 }
 

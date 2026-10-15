@@ -15,9 +15,12 @@ import kotlin.math.sqrt
  *  file had, so the app can say it took the first one rather than quietly discarding the rest. */
 class Audio(val rate: Double, val samples: DoubleArray, val channels: Int = 1)
 
-/** Minimal WAV reader: PCM 8/16/24/32 bit integer and 32 bit float, first channel only. */
+/** Minimal WAV reader: PCM 8/16/24/32 bit integer and 32 bit float. */
 object Wav {
-    fun decode(bytes: ByteArray): Audio? {
+    /** Which channel of a multi-channel file to take; [MIX] averages them all. */
+    const val MIX = -1
+
+    fun decode(bytes: ByteArray, channel: Int = 0): Audio? {
         if (bytes.size < 44 || str(bytes, 0, 4) != "RIFF" || str(bytes, 8, 4) != "WAVE") return null
         var at = 12
         var format = 0; var channels = 0; var rate = 0; var bits = 0
@@ -42,18 +45,24 @@ object Wav {
         if (step < 1 || (format != 1 && format != 3) || (format == 3 && bits != 32)) return null
         val frames = dataLen / (step * channels)
         if (frames < 8) return null
+        if (channel != MIX && channel !in 0 until channels) return null
+        fun sample(p: Int): Double? = when {
+            format == 3 -> Float.fromBits(le32(bytes, p)).toDouble()
+            bits == 8 -> ((bytes[p].toInt() and 255) - 128) / 128.0
+            bits == 16 -> le16signed(bytes, p) / 32768.0
+            bits == 24 -> (((bytes[p].toInt() and 255) or ((bytes[p + 1].toInt() and 255) shl 8) or
+                (bytes[p + 2].toInt() shl 16)) shl 8 shr 8) / 8388608.0
+            bits == 32 -> le32(bytes, p) / 2147483648.0
+            else -> null
+        }
         val out = DoubleArray(frames)
         for (i in 0 until frames) {
-            val p = dataAt + i * step * channels
-            out[i] = when {
-                format == 3 -> Float.fromBits(le32(bytes, p)).toDouble()
-                bits == 8 -> ((bytes[p].toInt() and 255) - 128) / 128.0
-                bits == 16 -> le16signed(bytes, p) / 32768.0
-                bits == 24 -> (((bytes[p].toInt() and 255) or ((bytes[p + 1].toInt() and 255) shl 8) or
-                    (bytes[p + 2].toInt() shl 16)) shl 8 shr 8) / 8388608.0
-                bits == 32 -> le32(bytes, p) / 2147483648.0
-                else -> return null
-            }
+            val frame = dataAt + i * step * channels
+            if (channel == MIX) {
+                var sum = 0.0
+                for (c in 0 until channels) sum += sample(frame + c * step) ?: return null
+                out[i] = sum / channels
+            } else out[i] = sample(frame + channel * step) ?: return null
             if (!out[i].isFinite()) return null
         }
         return Audio(rate.toDouble(), out, channels)
@@ -130,8 +139,12 @@ object Fit {
         val attenuatedDb: Double
     )
 
-    /** Trims silence, limits the length to what sixteen sections can represent, and fades the end. */
-    fun prepare(audio: Audio): DoubleArray {
+    /** The longest impulse sixteen sections can be asked to represent. */
+    const val MAX_MS = 170
+
+    /** Trims silence, limits the length to what sixteen sections can represent, and fades the end.
+     *  [lengthMs] can shorten that further, to drop a room tail the file carries. */
+    fun prepare(audio: Audio, lengthMs: Int = MAX_MS): DoubleArray {
         val h = audio.samples
         var peak = 0.0
         for (x in h) peak = max(peak, abs(x))
@@ -139,7 +152,7 @@ object Fit {
         val threshold = peak * 1e-3
         var start = 0
         while (start < h.size && abs(h[start]) < threshold) start++
-        val maxLength = (0.17 * audio.rate).toInt()
+        val maxLength = (lengthMs.coerceIn(10, MAX_MS) / 1000.0 * audio.rate).toInt()
         val n = min(h.size - start, maxLength)
         if (n < 8) return DoubleArray(0)
         val out = DoubleArray(n) { h[start + it] }

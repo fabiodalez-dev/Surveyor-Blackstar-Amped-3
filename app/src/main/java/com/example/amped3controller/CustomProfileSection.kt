@@ -1,6 +1,5 @@
 package com.example.amped3controller
 
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -9,12 +8,14 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.amped3controller.dsp.CabLab
+import com.example.amped3controller.dsp.CabProfile
+import com.example.amped3controller.dsp.Fit
+import com.example.amped3controller.dsp.Wav
 import java.util.Locale
 
 /**
@@ -25,13 +26,21 @@ import java.util.Locale
  * What is not guaranteed is how it sounds, which is why nothing is sent until the checks pass and
  * why the first listen happens with the cabinet level at its minimum.
  */
-@Composable internal fun CustomProfileSection(s:AmpState,c:AmpedMidiController,onImportIr:()->Unit){
+@Composable internal fun CustomProfileSection(s:AmpState,c:AmpedMidiController,actions:UiActions){
     val conversion by c.conversion.collectAsState()
     val saved by c.customProfiles.collectAsState()
+    val options by c.irOptions.collectAsState()
+    val batch by c.batchReport.collectAsState()
     var name by remember { mutableStateOf("") }
+    var scrivendo by remember { mutableStateOf<String?>(null) }
+    var slotTarget by remember { mutableStateOf<CustomProfile?>(null) }
+
+    LibrarySection(s, c) { p -> slotTarget = p; scrivendo = p.id }
+    CabLabSection(s, c)
+
     Section(T("Profili da risposta all'impulso", "Profiles from an impulse response"))
-    Text(T("Sperimentale. La conversione tiene i poli della cassa caricata, quindi la stabilita' e' quella di un profilo di fabbrica. Il suono invece non e' garantito: nulla viene inviato se i controlli non passano.",
-           "Experimental. The fit keeps the poles of the loaded cabinet, so stability is that of a factory profile. The sound is not guaranteed: nothing is sent unless the checks pass."),
+    Text(T("Sperimentale. La conversione tiene i poli di una cassa di fabbrica, quindi la stabilita' e' quella di un profilo di fabbrica. Il suono invece non e' garantito: nulla viene inviato se i controlli non passano.",
+           "Experimental. The fit keeps the poles of a factory cabinet, so stability is that of a factory profile. The sound is not guaranteed: nothing is sent unless the checks pass."),
         color=Muted,fontSize=12.sp)
     if (s.customLoaded) {
         Box(Modifier.fillMaxWidth().padding(vertical=10.dp).background(Color(0xFF3A1512),RoundedCornerShape(10.dp)).padding(14.dp)) {
@@ -45,27 +54,54 @@ import java.util.Locale
             }
         }
     }
-    Text(T("Il file: WAV, qualunque frequenza di campionamento (non serve ricampionare), PCM a 8/16/24/32 bit o float a 32. Di un file a piu' canali viene usato il primo. Deve essere la risposta all'impulso di una cassa: se ne usano i primi 170 ms, perche' sedici filtri non possono rendere una coda di riverbero.",
-           "The file: WAV, any sample rate (no resampling needed), 8/16/24/32-bit PCM or 32-bit float. From a multi-channel file the first channel is used. It has to be a cabinet impulse response: the first 170 ms are used, because sixteen filters cannot render a reverb tail."),
-        color=Muted,fontSize=12.sp,modifier=Modifier.padding(top=8.dp,bottom=10.dp))
-    OutlinedButton(onClick=onImportIr,enabled=!s.busy,modifier=Modifier.fillMaxWidth()) {
-        Text(T("Converti un file WAV", "Convert a WAV file"))
+    Text(T("Il file: WAV, qualunque frequenza di campionamento (non serve ricampionare), PCM a 8/16/24/32 bit o float a 32. Deve essere la risposta all'impulso di una cassa: se ne usano al massimo i primi 170 ms, perche' sedici filtri non possono rendere una coda di riverbero.",
+           "The file: WAV, any sample rate (no resampling needed), 8/16/24/32-bit PCM or 32-bit float. It has to be a cabinet impulse response: at most the first 170 ms are used, because sixteen filters cannot render a reverb tail."),
+        color=Muted,fontSize=12.sp,modifier=Modifier.padding(top=8.dp,bottom=6.dp))
+
+    // options read by the picker: channel, length, pole bank
+    Text(T("Opzioni di conversione", "Conversion options").uppercase(), color=Muted, fontSize=11.sp, fontWeight=FontWeight.Bold, letterSpacing=1.4.sp)
+    Choices(T("Canale (file stereo)", "Channel (stereo files)"), options.channel, listOf(T("Primo", "First") to 0, T("Secondo", "Second") to 1, "Mix" to Wav.MIX), true) { c.irOptions.value = options.copy(channel = it) }
+    Row(Modifier.fillMaxWidth(), horizontalArrangement=Arrangement.SpaceBetween) {
+        Text(T("Lunghezza usata", "Length used"), color=Muted, fontSize=12.sp)
+        Text("${options.lengthMs} ms", color=Paper, fontSize=12.sp, fontWeight=FontWeight.Bold)
     }
+    Slider(value=options.lengthMs.toFloat(), onValueChange={ c.irOptions.value = options.copy(lengthMs = it.toInt()) }, valueRange=20f..Fit.MAX_MS.toFloat(), steps=14,
+        colors=SliderDefaults.colors(thumbColor=Red, activeTrackColor=Red))
+    Choices(T("Banco di poli", "Pole bank"), when (options.template) { null -> 0; IrOptions.AUTO -> 1; else -> 2 },
+        listOf(T("Cassa caricata", "Loaded cabinet") to 0, T("Il più vicino (3 tentativi)", "Nearest (tries 3)") to 1, T("Scelto…", "Chosen…") to 2), true) {
+        c.irOptions.value = options.copy(template = when (it) { 0 -> null; 1 -> IrOptions.AUTO; else -> options.template?.takeIf { t -> t != IrOptions.AUTO } ?: "21:0:0" })
+    }
+    if (options.template != null && options.template != IrOptions.AUTO) CabinetPicker(T("Banco di poli", "Pole bank"), options.template!!) { c.irOptions.value = options.copy(template = it) }
+
+    Row(Modifier.fillMaxWidth().padding(top=6.dp), horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+        OutlinedButton(onClick=actions.importIr,enabled=!s.busy,modifier=Modifier.weight(1f)) { Text(T("Converti un WAV", "Convert a WAV")) }
+        OutlinedButton(onClick=actions.importIrs,enabled=!s.busy,modifier=Modifier.weight(1f)) { Text(T("Più WAV in lotto", "Several WAVs")) }
+    }
+    c.lastIrName?.let { last ->
+        TextButton(onClick={ c.reconvertIr(options) }, enabled=!s.busy) { Text(T("Riconverti \"$last\" con queste opzioni", "Reconvert \"$last\" with these options"), fontSize=12.sp) }
+    }
+    if (batch.isNotEmpty()) Column(Modifier.fillMaxWidth().padding(top=6.dp).background(Panel,RoundedCornerShape(8.dp)).padding(10.dp)) {
+        Text(T("Lotto", "Batch").uppercase(), color=Muted, fontSize=11.sp, fontWeight=FontWeight.Bold, letterSpacing=1.4.sp)
+        batch.forEach { Text(it, color=if (it.startsWith("✓")) Paper else Red, fontSize=11.sp) }
+    }
+
     conversion?.let { k ->
         val metrics = k.verdict.metrics
         Column(Modifier.fillMaxWidth().padding(top=12.dp).background(Panel,RoundedCornerShape(10.dp)).padding(14.dp)) {
             Text(k.source,color=Paper,fontWeight=FontWeight.Bold,fontSize=14.sp)
-            Text(T("Scostamento dalla risposta d'origine: %.2f dB".format(Locale.US,k.errorDb),
-                   "Deviation from the source response: %.2f dB".format(Locale.US,k.errorDb)),color=Muted,fontSize=12.sp)
-            Text(T("Banco di poli: ${k.templateKey}", "Pole bank: ${k.templateKey}"),color=Muted,fontSize=12.sp)
-            Text(
+            k.recipe?.let { Text(it.describe { key -> FactoryProfiles.name(key) }, color=Muted, fontSize=12.sp) }
+            Text(T("Scostamento dal bersaglio: %.2f dB · bassi %.1f · medi %.1f · alti %.1f".format(Locale.US,k.errorDb,k.bands.lowDb,k.bands.midDb,k.bands.highDb),
+                   "Deviation from the target: %.2f dB · lows %.1f · mids %.1f · highs %.1f".format(Locale.US,k.errorDb,k.bands.lowDb,k.bands.midDb,k.bands.highDb)),color=Muted,fontSize=12.sp)
+            Text(T("Banco di poli: ${k.templateKey} (${FactoryProfiles.name(k.templateKey)})", "Pole bank: ${k.templateKey} (${FactoryProfiles.name(k.templateKey)})"),color=Muted,fontSize=12.sp)
+            if (k.recipe == null) Text(
                 T("%.0f Hz · %s · %d ms usati%s".format(Locale.US, k.rate,
-                    if (k.channels > 1) "primo di ${k.channels} canali" else "mono", k.usedMs,
+                    if (k.channels > 1) "canale ${channelName(k.options?.channel ?: 0)} di ${k.channels}" else "mono", k.usedMs,
                     if (k.truncated) " (file troncato)" else ""),
                   "%.0f Hz · %s · %d ms used%s".format(Locale.US, k.rate,
-                    if (k.channels > 1) "first of ${k.channels} channels" else "mono", k.usedMs,
+                    if (k.channels > 1) "channel ${channelName(k.options?.channel ?: 0)} of ${k.channels}" else "mono", k.usedMs,
                     if (k.truncated) " (file truncated)" else "")),
                 color=Muted,fontSize=12.sp)
+            Text(T("Cassa di fabbrica più vicina: ", "Nearest factory cabinet: ") + k.nearest.joinToString(" · ") { "%s (%.1f dB)".format(Locale.US, FactoryProfiles.name(it.first), it.second) }, color=Muted, fontSize=11.sp)
             if (k.attenuatedDb < -0.05) Text(
                 T("Attenuato di %.1f dB per rientrare nei limiti".format(Locale.US,k.attenuatedDb),
                   "Attenuated by %.1f dB to stay within limits".format(Locale.US,k.attenuatedDb)),color=Muted,fontSize=12.sp)
@@ -77,7 +113,11 @@ import java.util.Locale
                        "peak %.1f dB · 20 Hz %.0f dB · tail %.0f ms".format(Locale.US,it.peakDb,it.hz20Db,it.t60*1000)),
                     color=Muted,fontSize=11.sp)
             }
-            ResponseCurve(k.header,k.chunks,k.templateHeader,k.templateChunks)
+            val fitted = remember(k.header) { CabProfile.decode(k.header, k.chunks)?.let { CabLab.curveDb(it) } }
+            fitted?.let {
+                ResponseGraph(listOf(Curve(it, Red, T("convertito", "fitted")), Curve(k.targetCurve, CurveColours[4], T("bersaglio", "target"), 1.5f),
+                    Curve(c.factory.curve(k.templateKey), CurveColours[1], T("banco di poli", "pole bank"), 1.2f)))
+            }
             OutlinedTextField(value=name,onValueChange={name=it.take(60)},label={Text(T("Nome", "Name"))},
                 singleLine=true,modifier=Modifier.fillMaxWidth().padding(top=8.dp))
             Row(Modifier.fillMaxWidth().padding(top=8.dp),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
@@ -90,36 +130,83 @@ import java.util.Locale
             }
         }
     }
+
+    // --- the user's own profiles ---------------------------------------------------------
+    Section(T("I miei profili", "My profiles"))
+    var sort by remember { mutableStateOf("date") }
+    var onlyFavorites by remember { mutableStateOf(false) }
+    var filter by remember { mutableStateOf("") }
+    var abA by remember { mutableStateOf<String?>(null) }
+    var abB by remember { mutableStateOf<String?>(null) }
+    FlowRowCompat {
+        Chip(T("Recenti", "Newest"), sort == "date") { sort = "date" }
+        Chip(T("Nome", "Name"), sort == "name") { sort = "name" }
+        Chip(T("Errore", "Error"), sort == "error") { sort = "error" }
+        Chip("★", onlyFavorites) { onlyFavorites = !onlyFavorites }
+    }
+    if (saved.size > 3) OutlinedTextField(value=filter,onValueChange={filter=it.take(30)},placeholder={Text(T("cerca nei profili…", "search profiles…"))},singleLine=true,modifier=Modifier.fillMaxWidth())
+    val shown = saved.filter { !onlyFavorites || it.favorite }.filter { filter.isBlank() || it.name.contains(filter, true) || it.notes.contains(filter, true) }
+        .let { l -> when (sort) { "name" -> l.sortedBy { it.name.lowercase() }; "error" -> l.sortedBy { if (it.errorDb.isNaN()) 99.0 else it.errorDb }; else -> l.sortedByDescending { it.created } } }
+    if (saved.isEmpty()) Text(T("Nessun profilo salvato.", "No saved profiles."), color=Muted, fontSize=12.sp)
+
+    // A/B: two profiles, one tap each, through the ordinary audition with its recovery snapshot
+    if (saved.size >= 2) {
+        Text(T("Confronto A/B: scegli due profili dalla lista, poi alterna.", "A/B: pick two profiles from the list, then switch."), color=Muted, fontSize=11.sp)
+        Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+            val a = saved.firstOrNull { it.id == abA }; val b = saved.firstOrNull { it.id == abB }
+            Button(onClick={ a?.let { c.audition(it) } }, enabled=a != null && s.synced && !s.busy, modifier=Modifier.weight(1f)) { Text("A · " + (a?.name?.take(14) ?: "—"), fontSize=12.sp) }
+            Button(onClick={ b?.let { c.audition(it) } }, enabled=b != null && s.synced && !s.busy, modifier=Modifier.weight(1f)) { Text("B · " + (b?.name?.take(14) ?: "—"), fontSize=12.sp) }
+        }
+    }
+
     var confirmingCustom by remember { mutableStateOf<CustomProfile?>(null) }
     var existingSlot by remember { mutableIntStateOf(1) }
-    var scrivendo by remember { mutableStateOf<String?>(null) }
+    var editing by remember { mutableStateOf<String?>(null) }
+    var editName by remember { mutableStateOf("") }
+    var editNotes by remember { mutableStateOf("") }
     var slot by remember { mutableIntStateOf(1) }
     var nomeBanco by remember { mutableStateOf("") }
-    saved.forEach { profile ->
+    val slotTargets = (slotTarget?.let { listOf(it) } ?: emptyList()) + shown
+    slotTargets.distinctBy { it.id }.forEach { profile ->
+        val mine = saved.any { it.id == profile.id }
         Column(Modifier.fillMaxWidth().padding(top=10.dp)) {
-            Row(verticalAlignment=Alignment.CenterVertically) {
+            if (mine) Row(verticalAlignment=Alignment.CenterVertically) {
+                TextButton(onClick={c.toggleFavoriteCustom(profile.id)}) { Text(if (profile.favorite) "★" else "☆", color=if (profile.favorite) Red else Muted, fontSize=18.sp) }
                 Column(Modifier.weight(1f)) {
                     Text(profile.name,color=Paper,fontWeight=FontWeight.Bold)
-                    Text("${profile.source} · %.2f dB".format(Locale.US,profile.errorDb) +
+                    Text("${profile.source} · %.2f dB · ${profile.templateKey}".format(Locale.US,profile.errorDb) +
                         (if (!profile.passed) T(" · da riverificare", " · will be re-checked") else ""),
                         color=Muted,fontSize=11.sp)
+                    profile.recipe?.let { Text(it.describe { k -> FactoryProfiles.name(k) }, color=Muted, fontSize=10.sp) }
+                    if (profile.notes.isNotBlank()) Text(profile.notes, color=Muted, fontSize=11.sp)
                 }
-                TextButton(onClick={c.audition(profile)},enabled=s.synced&&!s.busy){
-                    Text(T("Prova", "Try"))
-                }
-                TextButton(onClick={
-                    scrivendo = if (scrivendo == profile.id) null else profile.id
-                    nomeBanco = profile.name.take(21)
-                    slot = if (s.cabSlot in 1..3) s.cabSlot else 1
-                },enabled=s.synced&&!s.busy){ Text(T("Nel banco…", "To a slot…")) }
-                TextButton(onClick={c.deleteCustom(profile.id)}){Text(T("Elimina", "Delete"),color=Muted)}
+                TextButton(onClick={c.audition(profile)},enabled=s.synced&&!s.busy){ Text(T("Prova", "Try")) }
             }
-            TextButton(onClick={confirmingCustom=profile;existingSlot=if(s.cabSlot in 1..3) s.cabSlot else 1},enabled=s.synced&&!s.busy) {
-                Text(T("Questo custom è già in un banco…", "This custom is already in a slot…"))
+            if (mine) FlowRowCompat {
+                Chip(T("Nel banco…", "To a slot…"), scrivendo == profile.id) {
+                    scrivendo = if (scrivendo == profile.id) null else profile.id
+                    nomeBanco = profile.name.take(21); slot = if (s.cabSlot in 1..3) s.cabSlot else 1
+                }
+                Chip(T("Modifica", "Edit"), editing == profile.id) { editing = if (editing == profile.id) null else profile.id; editName = profile.name; editNotes = profile.notes }
+                Chip(T("Duplica", "Duplicate"), false) { c.duplicateCustom(profile.id) }
+                Chip(T("Esporta", "Export"), false) { actions.exportProfile(profile) }
+                profile.recipe?.let { r -> Chip(T("Nel lab", "In the lab"), false) { c.labRecipe.value = r } }
+                if (saved.size >= 2) { Chip("A", abA == profile.id) { abA = profile.id }; Chip("B", abB == profile.id) { abB = profile.id } }
+                Chip(T("Già in un banco…", "Already in a slot…"), false) { confirmingCustom = profile; existingSlot = if (s.cabSlot in 1..3) s.cabSlot else 1 }
+                Chip(T("Elimina", "Delete"), false) { c.deleteCustom(profile.id) }
+            }
+            if (mine && editing == profile.id) Column(Modifier.fillMaxWidth().padding(top=6.dp).background(Panel,RoundedCornerShape(8.dp)).padding(10.dp)) {
+                OutlinedTextField(value=editName,onValueChange={editName=it.take(60)},label={Text(T("Nome", "Name"))},singleLine=true,modifier=Modifier.fillMaxWidth())
+                OutlinedTextField(value=editNotes,onValueChange={editNotes=it.take(500)},label={Text(T("Note", "Notes"))},modifier=Modifier.fillMaxWidth().padding(top=6.dp))
+                Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                    TextButton(onClick={ c.renameCustom(profile.id, editName); c.annotateCustom(profile.id, editNotes); editing = null }) { Text(T("Salva", "Save")) }
+                    TextButton(onClick={ editing = null }) { Text(T("Annulla", "Cancel"), color=Muted) }
+                }
             }
             if (scrivendo == profile.id) {
                 Column(Modifier.fillMaxWidth().padding(top=8.dp)
                     .background(Color(0xFF221A17),RoundedCornerShape(10.dp)).padding(14.dp)) {
+                    if (!mine) Text(profile.name, color=Paper, fontWeight=FontWeight.Bold)
                     Text(T("Scrivere nella memoria della pedaliera", "Writing into the pedal's memory"),
                         color=Paper,fontWeight=FontWeight.Black,fontSize=13.sp,letterSpacing=1.sp)
                     Text(T("La prova tiene il profilo solo finche' la pedaliera resta accesa: allo spegnimento torna la cassa memorizzata. Scrivere nel banco lo rende permanente, ma sovrascrive la cassa che c'e' adesso in quel banco.",
@@ -145,13 +232,13 @@ import java.util.Locale
                     OutlinedTextField(value=nomeBanco,onValueChange={nomeBanco=it.take(21)},
                         label={Text(T("Nome nel banco (max 21)", "Name in the slot (max 21)"))},
                         singleLine=true,modifier=Modifier.fillMaxWidth().padding(top=10.dp))
-                    Button(onClick={ c.writeCustomToSlot(profile, slot, nomeBanco.trim()); scrivendo = null },
+                    Button(onClick={ c.writeCustomToSlot(profile, slot, nomeBanco.trim()); scrivendo = null; slotTarget = null },
                         enabled=s.synced&&!s.busy&&nomeBanco.isNotBlank(),
                         colors=ButtonDefaults.buttonColors(containerColor=Red,contentColor=Color.White),
                         modifier=Modifier.fillMaxWidth().padding(top=10.dp)) {
                         Text(T("Sovrascrivi il banco $slot", "Overwrite slot $slot"))
                     }
-                    TextButton(onClick={ scrivendo = null },modifier=Modifier.fillMaxWidth()) {
+                    TextButton(onClick={ scrivendo = null; slotTarget = null },modifier=Modifier.fillMaxWidth()) {
                         Text(T("Annulla", "Cancel"),color=Muted)
                     }
                 }
@@ -169,58 +256,4 @@ import java.util.Locale
     }
 }
 
-/**
- * The converted profile in red over the cabinet it was fitted on in grey, 40 Hz to 16 kHz on a log
- * axis. It is the modelled response, from the coefficients: no sweep has ever been measured at the
- * pedal's output, so read it as what the maths says, not as what the speaker does.
- */
-@Composable internal fun ResponseCurve(header:String,chunks:List<String>,baseHeader:String?,baseChunks:List<String>?){
-    val values = remember(header) { com.example.amped3controller.dsp.CabProfile.decode(header,chunks) }
-    val base = remember(baseHeader) {
-        if (baseHeader != null && baseChunks != null) com.example.amped3controller.dsp.CabProfile.decode(baseHeader,baseChunks) else null
-    }
-    if (values == null) return
-    val points = 200
-    val lo = kotlin.math.ln(40.0); val hi = kotlin.math.ln(16000.0)
-    fun curve(v: FloatArray) = DoubleArray(points) { i ->
-        val hz = kotlin.math.exp(lo + (hi - lo) * i / (points - 1.0))
-        com.example.amped3controller.dsp.CabProfile.db(
-            com.example.amped3controller.dsp.CabProfile.magnitudeAtHz(v, hz))
-    }
-    val db = curve(values)
-    val dbBase = base?.let { curve(it) }
-    Column(Modifier.fillMaxWidth().padding(top=12.dp)) {
-        Canvas(Modifier.fillMaxWidth().height(130.dp)) {
-            val top = (maxOf(db.max(), dbBase?.max() ?: -99.0) + 4).coerceAtLeast(6.0)
-            val bottom = top - 48
-            fun y(v: Double) = (size.height * (top - v) / (top - bottom)).toFloat().coerceIn(0f, size.height)
-            for (g in 1..3) {
-                val yy = size.height * g / 4f
-                drawLine(Color(0xFF2A2A2D), Offset(0f, yy), Offset(size.width, yy), 1.dp.toPx())
-            }
-            // decade marks at 100 Hz, 1 kHz, 10 kHz so the eye has somewhere to stand
-            listOf(100.0, 1000.0, 10000.0).forEach { hz ->
-                val x = (size.width * (kotlin.math.ln(hz) - lo) / (hi - lo)).toFloat()
-                drawLine(Color(0xFF2A2A2D), Offset(x, 0f), Offset(x, size.height), 1.dp.toPx())
-            }
-            fun trace(data: DoubleArray, colour: Color, width: Float) {
-                var previous = Offset(0f, y(data[0]))
-                for (i in 1 until points) {
-                    val point = Offset(size.width * i / (points - 1f), y(data[i]))
-                    drawLine(colour, previous, point, width, StrokeCap.Round)
-                    previous = point
-                }
-            }
-            dbBase?.let { trace(it, Color(0xFF6E6A67), 1.5.dp.toPx()) }
-            trace(db, Red, 2.dp.toPx())
-        }
-        Row(Modifier.fillMaxWidth().padding(top=4.dp),horizontalArrangement=Arrangement.SpaceBetween) {
-            Text("40 Hz",color=Muted,fontSize=10.sp)
-            Text("100 Hz · 1 kHz · 10 kHz",color=Color(0xFF3A3A3D),fontSize=10.sp)
-            Text("16 kHz",color=Muted,fontSize=10.sp)
-        }
-        Text(T("rosso: convertito · grigio: cassa di partenza · risposta modellata, non misurata",
-               "red: converted · grey: source cabinet · modelled response, not measured"),
-            color=Muted,fontSize=10.sp,modifier=Modifier.padding(top=2.dp))
-    }
-}
+private fun channelName(ch: Int) = when (ch) { Wav.MIX -> "mix"; else -> (ch + 1).toString() }

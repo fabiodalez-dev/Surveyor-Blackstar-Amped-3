@@ -22,7 +22,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import java.util.Locale
 
-@Composable internal fun CabPage(s:AmpState,c:AmpedMidiController,onImportIr:()->Unit={}){
+@Composable internal fun CabPage(s:AmpState,c:AmpedMidiController,actions:UiActions=UiActions()){
     val name=AmpedProtocol.cabinetNames.getOrNull(s.cab[0])?:"CabRig"
     Heading(name,if(s.cabSlot>0)"CabRig · slot ${s.cabSlot}" else "CabRig")
     Column(verticalArrangement=Arrangement.spacedBy(8.dp), modifier=Modifier.fillMaxWidth().padding(bottom=12.dp)){
@@ -45,27 +45,85 @@ import java.util.Locale
         }
     }
     var cabinet by remember(s.cab[0]) { mutableIntStateOf(if (s.cab[0] in AmpedProtocol.cabinetNames.indices) s.cab[0] else 0) }
-    var cabinetExpanded by remember { mutableStateOf(false) }
     var mic by remember(s.cab[1]){mutableIntStateOf(if(s.cab[1] in 0..5) s.cab[1] else 0)}
     var axis by remember(s.cab[2]){mutableIntStateOf(if(s.cab[2]==1) 1 else 0)}
+    val prefs by c.cabinetPrefs.collectAsState()
+    val selectedKey = FactoryProfiles.key(cabinet, mic, axis)
+    fun pick(key: String) { val (a, b, d) = key.split(":").map { it.toInt() }; cabinet = a; mic = b; axis = d }
     CabinetDrawing(AmpedProtocol.cabinetNames.getOrNull(cabinet) ?: name,
         applied = cabinet == s.cab[0] && mic == s.cab[1] && axis == s.cab[2])
     Text(T("Libreria DSP completa · 24 casse × 6 microfoni × 2 assi", "Complete DSP library · 24 cabinets × 6 mics × 2 axes"),color=Muted,fontSize=12.sp)
+
+    // favourites and the last cabinets loaded, one tap away
+    if (prefs.favorites.isNotEmpty() || prefs.recents.isNotEmpty()) {
+        FlowRowCompat {
+            prefs.favorites.forEach { k -> Chip("★ " + FactoryProfiles.name(k), k == selectedKey) { pick(k) } }
+            prefs.recents.filter { it !in prefs.favorites }.forEach { k -> Chip("↺ " + FactoryProfiles.name(k), k == selectedKey) { pick(k) } }
+        }
+    }
+
+    // the list, narrowed by size, origin, build and a word
+    var size by remember { mutableStateOf("") }
+    var origin by remember { mutableStateOf("") }
+    var build by remember { mutableStateOf("") }
+    var query by remember { mutableStateOf("") }
+    var cabinetExpanded by remember { mutableStateOf(false) }
+    FlowRowCompat {
+        listOf("1x", "2x", "4x", "DI").forEach { f -> Chip(f, size == f) { size = if (size == f) "" else f } }
+        listOf("UK", "USA").forEach { f -> Chip(f, origin == f) { origin = if (origin == f) "" else f } }
+        listOf("Combo", "Open", "Closed", "Stack").forEach { f -> Chip(f, build == f) { build = if (build == f) "" else f } }
+    }
+    val matching = AmpedProtocol.cabinetNames.withIndex().filter { (_, n) ->
+        (size.isEmpty() || (if (size == "DI") n == "DI" else n.startsWith(size))) &&
+        (origin.isEmpty() || n.contains(origin)) && (build.isEmpty() || n.contains(build)) &&
+        (query.isBlank() || n.contains(query.trim(), ignoreCase = true))
+    }
     Text(T("Cassa", "Cabinet").uppercase(), color=Muted, fontSize=12.sp, fontWeight=FontWeight.Bold, letterSpacing=1.4.sp)
     Box(modifier = Modifier.fillMaxWidth()) {
         OutlinedButton(onClick={cabinetExpanded=true}, enabled=!s.busy, modifier=Modifier.fillMaxWidth().testTag("cabinet-selector")) {
-            Text(AmpedProtocol.cabinetNames[cabinet])
+            Text(AmpedProtocol.cabinetNames[cabinet] + if (matching.size < AmpedProtocol.cabinetNames.size) "  (${matching.size})" else "")
         }
         DropdownMenu(expanded=cabinetExpanded,onDismissRequest={cabinetExpanded=false}) {
-            AmpedProtocol.cabinetNames.forEachIndexed { i,n ->
+            OutlinedTextField(value=query,onValueChange={query=it.take(30)},placeholder={Text(T("cerca…", "search…"))},singleLine=true,modifier=Modifier.padding(horizontal=8.dp).testTag("cabinet-search"))
+            matching.forEach { (i, n) ->
                 DropdownMenuItem(text={Text(n)},onClick={cabinet=i;cabinetExpanded=false})
             }
+            if (matching.isEmpty()) DropdownMenuItem(text={Text(T("Nessuna cassa con questi filtri", "No cabinet matches"),color=Muted)},onClick={})
         }
     }
-    Choices(T("Microfono", "Microphone"),mic,listOf("57 Dynamic" to 0,"421 Dynamic" to 1,"67 Condenser" to 2,"414 Condenser" to 3,"121 Ribbon" to 4,"160 Ribbon" to 5),!s.busy){mic=it}
+    Choices(T("Microfono", "Microphone"),mic,AmpedProtocol.micNames.mapIndexed { i, n -> n to i },!s.busy){mic=it}
     Choices(T("Asse", "Axis"),axis,listOf("On Axis" to 0,"Off Axis" to 1),!s.busy){axis=it}
-    Text(T("Selezionato: ", "Selected: ") + "${AmpedProtocol.cabinetNames[cabinet]} · ${listOf("57 Dyn","421 Dyn","67 Cond","414 Cond","121 Rib","160 Rib")[mic]} · ${if(axis==0)"On Axis" else "Off Axis"}",color=Muted,fontSize=12.sp)
-    Text(T("Caricato: ", "Loaded: ") + "$name · ${listOf("57 Dyn","421 Dyn","67 Cond","414 Cond","121 Rib","160 Rib").getOrNull(s.cab[1])?:"—"} · ${if(s.cab[2]==0)"On Axis" else if(s.cab[2]==1)"Off Axis" else "—"}",color=Muted,fontSize=12.sp)
+    Row(verticalAlignment=Alignment.CenterVertically) {
+        Text(T("Selezionato: ", "Selected: ") + FactoryProfiles.name(selectedKey),color=Muted,fontSize=12.sp,modifier=Modifier.weight(1f))
+        TextButton(onClick={c.toggleFavoriteCabinet(selectedKey)},modifier=Modifier.testTag("favorite-cabinet")) { Text(if (selectedKey in prefs.favorites) "★" else "☆", color=if (selectedKey in prefs.favorites) Red else Muted, fontSize=18.sp) }
+    }
+    Text(T("Caricato: ", "Loaded: ") + "$name · ${AmpedProtocol.micShortNames.getOrNull(s.cab[1])?:"—"} · ${if(s.cab[2]==0)"On Axis" else if(s.cab[2]==1)"Off Axis" else "—"}",color=Muted,fontSize=12.sp)
+
+    // what the choice sounds like, on paper: its curve, against whatever is worth comparing it with
+    var compare by remember { mutableStateOf("") }   // "", "B", "mics", "axis"
+    var keyB by remember { mutableStateOf("18:0:0") }
+    FlowRowCompat {
+        Chip(T("Solo questa", "This one"), compare == "") { compare = "" }
+        Chip(T("Contro un'altra", "Against another"), compare == "B") { compare = "B" }
+        Chip(T("I 6 microfoni", "All 6 mics"), compare == "mics") { compare = "mics" }
+        Chip(T("Asse on / off", "On / off axis"), compare == "axis") { compare = "axis" }
+    }
+    if (compare == "B") CabinetPicker("B", keyB) { keyB = it }
+    val curves = ArrayList<Curve>()
+    curves += Curve(c.factory.curve(selectedKey), Red, FactoryProfiles.name(selectedKey).take(28))
+    when (compare) {
+        "B" -> curves += Curve(c.factory.curve(keyB), CurveColours[2], FactoryProfiles.name(keyB).take(28))
+        "mics" -> (0..5).filter { it != mic }.forEachIndexed { n, m -> curves += Curve(c.factory.curve(FactoryProfiles.key(cabinet, m, axis)), CurveColours[(n + 1) % CurveColours.size], AmpedProtocol.micShortNames[m], 1.2f) }
+        "axis" -> curves += Curve(c.factory.curve(FactoryProfiles.key(cabinet, mic, 1 - axis)), CurveColours[2], if (axis == 0) "Off axis" else "On axis")
+    }
+    ResponseGraph(curves)
+    val character = remember(selectedKey) { com.example.amped3controller.dsp.CabLab.character(c.factory.curve(selectedKey)) }
+    Text(describe(character), color=Muted, fontSize=11.sp)
+    if (compare == "B") Text(T("Distanza fra le due: %.1f dB", "Distance between the two: %.1f dB").format(Locale.US, com.example.amped3controller.dsp.CabLab.distanceDb(c.factory.curve(selectedKey), c.factory.curve(keyB))), color=Muted, fontSize=11.sp)
+    val similar = remember(selectedKey) { c.factory.nearest(c.factory.curve(selectedKey), 4).drop(1) }
+    Text(T("Simili: ", "Similar: ") + similar.joinToString(" · ") { "%s (%.1f dB)".format(Locale.US, FactoryProfiles.name(it.first), it.second) }, color=Muted, fontSize=11.sp)
+    FlowRowCompat { similar.forEach { (k, _) -> Chip(FactoryProfiles.name(k), false) { pick(k) } } }
+
     Button(onClick={c.chooseCab(cabinet,mic,axis)},enabled=s.synced&&!s.busy,modifier=Modifier.fillMaxWidth().testTag("apply-cabinet")){Text(T("Applica profilo DSP", "Load DSP profile"))}
     if (!s.synced) Text(T("Collega AMPED 3 via USB OTG e premi Connetti per applicare il profilo scelto.", "Connect the AMPED 3 over USB OTG and tap Connect to load the chosen profile."), color=Muted, fontSize=12.sp)
     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -132,7 +190,7 @@ import java.util.Locale
     }
 
     Text(T("Le modifiche sono immediate.", "Changes take effect immediately."),color=Muted,fontSize=12.sp)
-    CustomProfileSection(s,c,onImportIr)
+    CustomProfileSection(s,c,actions)
 }
 /** Silhouette della cassa scelta. Coni e pollici si leggono dal nome ("4x12 Classic UK"),
  *  cosi' una 2x12 non viene disegnata come una 4x12. La voce DI non ha cassa: si disegna la presa. */
