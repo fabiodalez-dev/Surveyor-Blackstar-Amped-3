@@ -21,12 +21,27 @@ data class LibraryCab(
 ) {
     val captured get() = kind == "captured"
 
+    /** The make the cabinet is sold or described under, for the brand filter; "other" when none is named. */
+    val brand: String get() = brandOf("$cabinet $name $pack")
+
+    /** Everything a text search can match. */
+    val searchText: String get() = "$name $cabinet $speaker $mic $pack $author $style".lowercase()
+
     /** As a custom profile, so audition, slot write and the lab treat it like any other. */
     fun toCustomProfile(): CustomProfile = CustomProfile("lib:$id", name, 0L,
         if (captured) pack else T("progettata", "designed"), templateKey, cab, micIndex, axis, header, chunks,
         errorDb, attenuatedDb, true, recipe, "$cabinet · $speaker · $mic", false)
 
     companion object {
+        /** Brand keywords in the order they are tested; the first hit wins. */
+        val brands = listOf("Mesa", "Fender", "Marshall", "Orange", "Vox", "Bogner", "ENGL", "EVH", "Friedman", "Matchless", "Two-Rock", "Hiwatt", "Ampeg", "Roland", "Peavey", "Soldano", "Blackstar", "Laney")
+        private val brandPatterns = mapOf("Mesa" to Regex("mesa|boogie|recto|rectifier|lone ?star|cali"), "Fender" to Regex("fender|deluxe|twin|bassman|tweed|blackface|princeton|frontman"),
+            "Marshall" to Regex("marshall|1960|jcm|plexi|1959|brit"), "Orange" to Regex("orange|ppc|matamp"), "Vox" to Regex("\\bvox\\b|ac30|ac-30|a30"), "Bogner" to Regex("bogner|uber"),
+            "ENGL" to Regex("engl|ngl pro"), "EVH" to Regex("\\bevh\\b|5150"), "Friedman" to Regex("friedman"), "Matchless" to Regex("matchless"), "Two-Rock" to Regex("two.?rock|2rock"),
+            "Hiwatt" to Regex("hiwatt|whowatt"), "Ampeg" to Regex("ampeg|svt"), "Roland" to Regex("roland|jc-?120|jazz chorus"), "Peavey" to Regex("peavey|6505"), "Soldano" to Regex("soldano"),
+            "Blackstar" to Regex("blackstar"), "Laney" to Regex("laney"))
+        fun brandOf(text: String): String { val t = text.lowercase(); return brands.firstOrNull { brandPatterns[it]!!.containsMatchIn(t) } ?: "other" }
+
         fun parseList(text: String): List<LibraryCab> {
             val a = JSONArray(text)
             return (0 until a.length()).map { i ->

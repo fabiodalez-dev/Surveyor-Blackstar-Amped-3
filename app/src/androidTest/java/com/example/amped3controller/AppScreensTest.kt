@@ -101,7 +101,9 @@ class DemoScreensTest {
     @Test fun extraCabinetsAndLabAreListed() {
         rule.onNodeWithText("CabRig").performClick()
         rule.onNodeWithText("EXTRA CABINETS").performScrollTo().assertExists()
-        rule.onNodeWithText("real cabinets from CC0-licensed", substring = true).assertExists()
+        rule.onNodeWithText("real cabinets fitted from impulse responses", substring = true).assertExists()
+        rule.onNodeWithTag("library-search").performScrollTo().assertExists()
+        rule.onAllNodesWithText("Marshall (", substring = true)[0].performScrollTo().performClick()
         rule.onNodeWithText("classic rock").performScrollTo().performClick()
         rule.onAllNodesWithText("Marshall 1960AX Greenback", substring = true)[0].performScrollTo().assertExists()
         rule.onNodeWithText("CABINET LAB").performScrollTo().assertExists()

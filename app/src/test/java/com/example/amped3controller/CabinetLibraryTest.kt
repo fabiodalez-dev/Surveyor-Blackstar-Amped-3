@@ -52,7 +52,8 @@ class CabinetLibraryTest {
         }
         assertTrue(lib.count { it.captured } >= 20)
         assertTrue(lib.all { it.captured || it.recipe != null })
-        assertTrue(lib.filter { it.captured }.all { it.license.startsWith("CC0") })
+        assertTrue(lib.filter { it.captured }.all { it.pack.isNotBlank() && it.author.isNotBlank() })
+        assertTrue("brands: ${lib.map { it.brand }.distinct()}", setOf("Mesa", "Fender", "Marshall").all { b -> lib.any { it.brand == b } })
     }
 
     @Test fun aShippedCabinetBecomesAnOrdinaryCustomProfile() {
