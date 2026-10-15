@@ -37,6 +37,9 @@ class AmpedMidiController(private val context: Context) {
     private val operation = OperationGate()
     private var liveProfile: JSONObject? = null
     private val slotProfiles = mutableMapOf<Int, JSONObject>() // valid only in this uninterrupted USB session
+    /** Cabinet Level steps the app took off for the loaded cabinet (see [LevelMatch]); zero
+     *  whenever the level came from somewhere else: a slot, a preset, an audition, a reconnect. */
+    @Volatile private var levelApplied = 0
     private var syncDeadline = 0L
     private val savedReports = linkedMapOf<String, String>()
     private val store = LibraryStore(context.filesDir, ::log)
@@ -104,6 +107,7 @@ class AmpedMidiController(private val context: Context) {
                 link.open(d)
                 savedReports.clear()
                 liveProfile = null
+                levelApplied = 0
                 slotProfiles.clear()
                 mutable.update { AmpState(connected = true, status = T("Lettura della pedaliera…", "Reading the pedal…"), logs = it.logs, customLoaded = store.auditionOutstanding(), customName = it.customName) }
                 startSync()
@@ -151,7 +155,7 @@ class AmpedMidiController(private val context: Context) {
             val kind = b[1].toInt() and 255; val slot = b[2].toInt() and 255; val len = b[3].toInt() and 255
             if (kind == 0x16 && slot in 1..3) mutable.update { it.copy(ampSlot = slot) }
             if (kind == 6 && slot in 1..3) {
-                if (state.value.cabSlot != slot) liveProfile = slotProfiles[slot]
+                if (state.value.cabSlot != slot) { liveProfile = slotProfiles[slot]; levelApplied = 0 }
                 mutable.update { it.copy(cabSlot = slot) }
             }
             if (slot in 1..3 && len in 1..60 && kind in listOf(4,5,0x14,0x15)) {
@@ -212,6 +216,7 @@ class AmpedMidiController(private val context: Context) {
         require(slot in 1..3)
         write(AmpedProtocol.packet(2, 1, slot, 0))
         liveProfile = slotProfiles[slot]
+        levelApplied = 0
     }
     fun recallAmp(slot: Int) = enqueue("Cambio canale…") {
         require(slot in 1..3)
@@ -219,9 +224,49 @@ class AmpedMidiController(private val context: Context) {
     }
     fun chooseCab(cab: Int, mic: Int, axis: Int) {
         val p = profiles.find(cab,mic,axis) ?: return
-        enqueue("Caricamento CabRig…") { transfer(p); store.noteRecent(FactoryProfiles.key(cab, mic, axis)) }
+        val key = FactoryProfiles.key(cab, mic, axis)
+        val target = if (levelMatch) LevelMatch.steps(profiles.correctionDb(key)) else 0
+        var plan: LevelMatch.Plan? = null
+        enqueue("Caricamento CabRig…", afterSync = { plan?.let(::settleLevel) }) {
+            plan = loadLevelled(p, target)
+            store.noteRecent(key)
+        }
     }
+
+    /**
+     * Sends a profile with the cabinet level its loudness correction asks for. The level goes
+     * down before a louder cabinet is sent and up only after a quieter one is in place, so the
+     * louder of the two never plays at the higher level, not even for the length of a transfer.
+     * Returns the plan, for [settleLevel]. Until that runs the applied correction counts as
+     * zero, so a failure halfway can only make the next level lower.
+     */
+    private fun loadLevelled(p: JSONObject, target: Int): LevelMatch.Plan {
+        val now = state.value.cab[AmpedProtocol.CAB_CABINET_LEVEL]
+        val plan = LevelMatch.plan(now, levelApplied, target)
+        levelApplied = 0
+        if (plan.level < now) write(AmpedProtocol.parameter(true, AmpedProtocol.CAB_CABINET_LEVEL, plan.level))
+        transfer(p)
+        if (plan.level > now) write(AmpedProtocol.parameter(true, AmpedProtocol.CAB_CABINET_LEVEL, plan.level))
+        return plan
+    }
+
+    /** Records the correction from the level the pedal reports, not the one written, and says
+     *  so if the pedal did not take it. */
+    private fun settleLevel(plan: LevelMatch.Plan) {
+        val actual = state.value.cab[AmpedProtocol.CAB_CABINET_LEVEL]
+        levelApplied = minOf(0, actual - plan.own)
+        requireAccepted(emptyMap(), mapOf(AmpedProtocol.CAB_CABINET_LEVEL to plan.level))
+    }
+
     fun toggleFavoriteCabinet(key: String) = store.toggleFavorite(key)
+
+    /** Whether loading a cabinet levels its volume against the quietest factory cabinet. */
+    val levelMatch: Boolean get() = store.cabinetPrefs.value.levelMatch
+    /** Takes effect at the next cabinet loaded; nothing is written to the pedal here. */
+    fun setLevelMatch(on: Boolean) = store.setLevelMatch(on)
+    /** The correction levelling would apply to a profile, in dB; zero when unreadable. */
+    fun correctionDb(custom: CustomProfile): Double =
+        com.example.amped3controller.dsp.CabProfile.decode(custom.header, custom.chunks)?.let { profiles.correctionDb(it) } ?: 0.0
     fun applyEqPreset(name: String) {
         val preset = AmpedProtocol.eqPresets[name] ?: return
         enqueue("Equalizzazione…", afterSync = { requireAccepted(emptyMap(), preset) }) {
@@ -358,6 +403,7 @@ class AmpedMidiController(private val context: Context) {
             if (p.scope != "amp") {
                 transfer(coeff)
                 for (i in AmpedProtocol.cabPresetOffsets) write(AmpedProtocol.parameter(true,i,p.cab[i]))
+                levelApplied = 0
             }
         }
     }
@@ -527,6 +573,7 @@ class AmpedMidiController(private val context: Context) {
         enqueue("Prova del profilo…") {
             preserveAudition(state.value, custom.name)
             write(AmpedProtocol.parameter(true, AmpedProtocol.CAB_CABINET_LEVEL, 0))
+            levelApplied = 0
             transfer(custom.transferJson())
             mutable.update { it.copy(customLoaded = true, customName = custom.name) }
         }
@@ -543,6 +590,7 @@ class AmpedMidiController(private val context: Context) {
             write(AmpedProtocol.parameter(true, AmpedProtocol.CAB_CABINET_LEVEL, saved.getInt("level")))
             syncNow()
             check(state.value.cab[AmpedProtocol.CAB_CABINET_LEVEL] == saved.getInt("level"))
+            levelApplied = 0
             store.clearAudition()
             mutable.update { it.copy(customLoaded = false, customName = "") }
         }
@@ -552,8 +600,10 @@ class AmpedMidiController(private val context: Context) {
         val encodedName = try { AmpedProtocol.saveNamePacket(true, slot, name) } catch (e: IllegalArgumentException) {
             mutable.update { it.copy(status = e.message ?: "Nome non valido") }; return
         }
+        val target = if (levelMatch) LevelMatch.steps(correctionDb(custom)) else 0
         enqueue("Scrittura nel banco $slot…") {
             val s = state.value
+            val level = LevelMatch.plan(s.cab[AmpedProtocol.CAB_CABINET_LEVEL], levelApplied, target)
             val previous = readStored(true, slot)
             val oldDsp = requireSlotDsp(slot, previous)
             store.writeBackup("backup-before-save", JSONObject().put("kind", "cab").put("slot", slot)
@@ -561,15 +611,17 @@ class AmpedMidiController(private val context: Context) {
                 .put("liveCab", JSONArray(s.cab)).put("replacedBy", custom.name))
             preserveAudition(s, custom.name)
             write(AmpedProtocol.parameter(true, AmpedProtocol.CAB_CABINET_LEVEL, 0))
+            levelApplied = 0
             transfer(custom.transferJson())
-            // Save the original level, not the temporary audition attenuation.
-            write(AmpedProtocol.parameter(true, AmpedProtocol.CAB_CABINET_LEVEL, s.cab[AmpedProtocol.CAB_CABINET_LEVEL]))
+            // Save the user's level, levelled when that is on, not the temporary audition attenuation.
+            write(AmpedProtocol.parameter(true, AmpedProtocol.CAB_CABINET_LEVEL, level.level))
             syncNow()
             val expected = state.value.cab
             write(AmpedProtocol.packet(0xaf, slot-1, 0, 0))
             write(encodedName)
             awaitReport { (it[0].toInt() and 255) == 0xaf && (it[1].toInt() and 255) == slot-1 }
             check(Recovery.verifyCab(readStored(true, slot), name, expected)) { "Nome o parametri del banco non coincidono: conserva il backup" }
+            levelApplied = minOf(0, expected[AmpedProtocol.CAB_CABINET_LEVEL] - level.own)
             slotProfiles[slot] = custom.transferJson()
             log("Nome e 84 parametri verificati. Coefficienti inviati con ACK, non rileggibili dal dispositivo.")
             // Retain the audition recovery until an explicit, acknowledged restore.

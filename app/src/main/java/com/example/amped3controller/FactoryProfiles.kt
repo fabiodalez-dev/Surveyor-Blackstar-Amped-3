@@ -2,6 +2,7 @@ package com.example.amped3controller
 
 import com.example.amped3controller.dsp.CabLab
 import com.example.amped3controller.dsp.CabProfile
+import com.example.amped3controller.dsp.Loudness
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -32,6 +33,18 @@ class FactoryProfiles(json: String) {
     private val curves = HashMap<String, DoubleArray>()
     /** Modelled response on [CabLab.GRID_HZ], computed once per key. */
     @Synchronized fun curve(key: String): DoubleArray = curves.getOrPut(key) { CabLab.curveDb(values(key)) }
+
+    private val loudness = HashMap<String, Double>()
+    /** Estimated loudness of a factory profile, see [Loudness]; computed once per key. */
+    @Synchronized fun loudnessDb(key: String): Double = loudness.getOrPut(key) { Loudness.db(values(key)) }
+
+    /** The quietest non-marginal factory cabinet. Levelling turns every other cabinet down to it,
+     *  so it never asks the pedal for more than the user's own level. */
+    val loudnessReference: Double by lazy { keys.filter { it !in marginal }.minOf { loudnessDb(it) } }
+
+    /** The level change that brings any profile down to [loudnessReference]; never positive. */
+    fun correctionDb(values: FloatArray): Double = Loudness.correctionDb(values, loudnessReference)
+    fun correctionDb(key: String): Double = minOf(0.0, loudnessReference - loudnessDb(key))
 
     /** Every profile's coefficients, for searches; 288 decodes the first time, cached after. */
     fun all(): Map<String, FloatArray> = keys.associateWith { values(it) }

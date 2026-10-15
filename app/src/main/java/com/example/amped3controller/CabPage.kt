@@ -124,6 +124,16 @@ import java.util.Locale
     Text(T("Simili: ", "Similar: ") + similar.joinToString(" · ") { "%s (%.1f dB)".format(Locale.US, FactoryProfiles.name(it.first), it.second) }, color=Muted, fontSize=11.sp)
     FlowRowCompat { similar.forEach { (k, _) -> Chip(FactoryProfiles.name(k), false) { pick(k) } } }
 
+    // levelling: the cabinet level goes down for the louder cabinets, never up
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Checkbox(checked = prefs.levelMatch, onCheckedChange = { c.setLevelMatch(it) }, modifier = Modifier.testTag("level-match"))
+        Text(T("Livella il volume tra le casse", "Level the volume across cabinets"), modifier = Modifier.padding(start = 4.dp))
+    }
+    val correction = c.factory.correctionDb(selectedKey)
+    Text(if (prefs.levelMatch) T("Livello cassa per questa scelta: %+.1f dB rispetto al tuo. Le casse più forti vengono abbassate, nessuna viene alzata; vale dal prossimo caricamento.",
+            "Cabinet level for this choice: %+.1f dB from yours. Louder cabinets are turned down, none is turned up; applies from the next load.").format(Locale.US, LevelMatch.steps(correction) * 24.0 / 127.0)
+        else T("Spento: le casse brillanti suonano fino a circa 6 dB più forti di quelle scure.", "Off: bright cabinets sound up to about 6 dB louder than dark ones."),
+        color = Muted, fontSize = 11.sp)
     Button(onClick={c.chooseCab(cabinet,mic,axis)},enabled=s.synced&&!s.busy,modifier=Modifier.fillMaxWidth().testTag("apply-cabinet")){Text(T("Applica profilo DSP", "Load DSP profile"))}
     if (!s.synced) Text(T("Collega AMPED 3 via USB OTG e premi Connetti per applicare il profilo scelto.", "Connect the AMPED 3 over USB OTG and tap Connect to load the chosen profile."), color=Muted, fontSize=12.sp)
     Row(verticalAlignment = Alignment.CenterVertically) {
