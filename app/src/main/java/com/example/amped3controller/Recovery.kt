@@ -63,6 +63,7 @@ object Recovery {
     fun validateProfile(p: JSONObject): JSONObject {
         require(p.getInt("cab") in 0..23 && p.getInt("mic") in 0..5 && p.getInt("axis") in 0..1)
         val chunks = p.getJSONArray("chunks")
+        require(CabProfile.knownHeaderTail(p.getString("header"))) { "Unknown DSP header metadata" }
         require(CabProfile.decode(p.getString("header"), (0 until chunks.length()).map { chunks.getString(it) }) != null) { "Invalid DSP payload" }
         return p
     }

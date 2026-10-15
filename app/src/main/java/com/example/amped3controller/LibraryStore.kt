@@ -96,21 +96,24 @@ class LibraryStore(private val dir: File, private val log: (String) -> Unit) {
 
     private val prefsFile = File(dir, "cabinet_prefs.json")
     private val prefsMutable = MutableStateFlow(readPrefs())
-    /** Favourite factory keys ("cab:mic:axis") and the last ones loaded, most recent first. */
+    /** Favourite factory keys ("cab:mic:axis"), the last ones loaded, most recent first, and
+     *  whether loading a cabinet levels its volume (off unless the user turns it on). */
     val cabinetPrefs = prefsMutable.asStateFlow()
 
-    data class CabinetPrefs(val favorites: List<String> = emptyList(), val recents: List<String> = emptyList())
+    data class CabinetPrefs(val favorites: List<String> = emptyList(), val recents: List<String> = emptyList(),
+                            val levelMatch: Boolean = false)
 
     private fun readPrefs(): CabinetPrefs = runCatching {
         if (!prefsFile.exists()) return CabinetPrefs()
         val o = JSONObject(prefsFile.readText())
         fun list(key: String) = (o.optJSONArray(key) ?: JSONArray()).let { a -> (0 until a.length()).map { a.getString(it) } }
-            .filter { Regex("""\d{1,2}:\d:[01]""").matches(it) }
-        CabinetPrefs(list("favorites").take(50), list("recents").take(10))
+            .filter { Regex("""(1?\d|2[0-3]):[0-5]:[01]""").matches(it) }
+        CabinetPrefs(list("favorites").take(50), list("recents").take(10), o.optBoolean("levelMatch", false))
     }.getOrDefault(CabinetPrefs())
 
     @Synchronized private fun persistPrefs(p: CabinetPrefs) {
-        Recovery.write(prefsFile, JSONObject().put("favorites", JSONArray(p.favorites)).put("recents", JSONArray(p.recents)).toString())
+        Recovery.write(prefsFile, JSONObject().put("favorites", JSONArray(p.favorites)).put("recents", JSONArray(p.recents))
+            .put("levelMatch", p.levelMatch).toString())
         prefsMutable.value = p
     }
 
@@ -118,6 +121,8 @@ class LibraryStore(private val dir: File, private val log: (String) -> Unit) {
         val p = prefsMutable.value
         persistPrefs(p.copy(favorites = if (key in p.favorites) p.favorites - key else (p.favorites + key).takeLast(50)))
     }
+
+    fun setLevelMatch(on: Boolean) = persistPrefs(prefsMutable.value.copy(levelMatch = on))
 
     fun noteRecent(key: String) {
         val p = prefsMutable.value

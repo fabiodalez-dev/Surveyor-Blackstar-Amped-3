@@ -47,7 +47,7 @@ data class Recipe(
         fun parse(o: JSONObject): Recipe {
             val sh = o.optJSONObject("shape") ?: JSONObject()
             val mode = runCatching { CabLab.BlendMode.valueOf(o.optString("mode", "COMPLEX")) }.getOrDefault(CabLab.BlendMode.COMPLEX)
-            fun key(s: String?): String? = s?.takeIf { Regex("""\d{1,2}:\d:[01]""").matches(it) }
+            fun key(s: String?): String? = s?.takeIf { Regex("""(1?\d|2[0-3]):[0-5]:[01]""").matches(it) }
             val a = key(o.optString("a")) ?: throw IllegalArgumentException("recipe without a source")
             return Recipe(a, key(o.optString("b", "")), o.optDouble("ratioA", 1.0).coerceIn(0.0, 1.0), mode,
                 CabLab.Shape(
