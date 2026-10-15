@@ -1,43 +1,25 @@
-### Surveyor v1.6.0 — keep a converted cabinet, or just try it
+### Surveyor v1.8.0 — every cabinet at the same volume, if you want it
 
-Until now a converted profile lived only in the running DSP: switch the pedal off and the stored
-cabinet came back. That was deliberate, and it is now verified rather than assumed, because a power
-cycle on a physical AMPED 3 brought the live state back identical to the backup taken that morning:
-all 84 CabRig bytes and 51 of the 52 amplifier bytes, the owner's own unsaved edits gone with it.
-A power cycle is a guaranteed way back.
+Blackstar gives every factory cabinet the same energy, and the app's own conversions do the same. The ear does not hear it that way: it is most sensitive between 2 and 5 kHz, so a bright cabinet sounds louder than a dark one carrying the same energy. Across the 285 usable factory cabinets the difference is about 6 dB, a 1x12 with an alnico speaker at the quiet end, the off-axis ribbon 4x12s at the loud end. The 136 shipped cabinets spread the same way.
 
-Knowing that, the other half can be offered safely: a converted profile can now be **written into
-one of the three CabRig slots**, where it survives being switched off.
+#### Level the volume across cabinets
 
-#### Two ways, and the app says which is which
+A new option on the CabRig page, off unless you turn it on. When it is on, loading a cabinet sets the Cabinet Level to compensate: every factory choice lands within one level step, 0.19 dB, of the others. The line under the option tells you how much the selected cabinet will be corrected before you load it.
 
-**Try** loads the profile into the live DSP. It lasts until the pedal is switched off. Nothing in
-the pedal's memory is touched.
+It only ever turns down. Every cabinet is brought to the quietest factory one, nothing is raised, and the level never goes above the one you set. The order of the writes is chosen for the PA: the level drops before a louder cabinet is sent and comes back up only after a quieter one is in place, so the louder of the two never plays at the higher level, not even for the length of a transfer.
 
-**To a slot** makes it permanent, and says plainly that it overwrites the cabinet that slot holds
-today, showing you the three slots with their current names so you know what you are replacing.
-Before the pedal is touched, the slot's contents are read and written to the phone with an fsync;
-the save is confirmed by its acknowledgement; and the slot is read back and compared. If any of
-that fails the app says the write is unconfirmed and tells you to keep the backup rather than
-repeat it.
+Your own level is kept. Move the Cabinet Level fader and change cabinet, and the app works from your new level. After anything that sets the level on its own — a slot recall, a preset, an audition, a reconnect, or an error — the app assumes no correction is in place, which can only make the next level lower, never higher. Writing a converted cabinet to a slot applies the same correction, so the slots stay level when you switch them on the pedal's own footswitch. Auditions still start at the minimum level.
 
-#### Checked against the bytes, not against a flag
+The loudness is estimated from the modelled response of each cabinet (pink noise through the same weighting LUFS meters use), not measured on the pedal. `tools/loudness.py` repeats the calculation offline.
 
-A profile is re-verified immediately before it leaves, by decoding the coefficients that are about
-to be sent and running the full acceptance test on them. A verdict stored when the profile was made
-describes an older version of the code; this describes these coefficients now. A profile that fails
-is not sent, and the reason is shown.
+#### A shared profile cannot carry unknown metadata
 
-#### Verified on the hardware
+Since 1.7.0 a single profile can be exported as a `.cab.json` and imported by someone else. The header of every profile carries six bytes whose meaning is unknown; all 288 factory profiles have the same six. Until now any value was passed to the pedal. A profile with anything else there is now refused, both when it is imported and immediately before it would be sent. Every factory, shipped and app-made profile already carries the factory value, so nothing you have is affected.
 
-A profile fitted by the app's own code was loaded into a physical AMPED 3: the transfer completed,
-the amplifier block was untouched, and the CabRig block moved only at the cabinet level, which had
-been set to its minimum first. The same profile was independently checked in Python before it was
-sent and agreed with the app to the digit. All six stored slots were byte-identical to the backup
-afterwards.
+A shared recipe naming a cabinet outside the factory 24 × 6 × 2 matrix used to crash the lab's preview; it is now ignored.
 
-`docs/CUSTOM_PROFILES.md` carries the power cycle result and a note on why the USB audio path
-cannot be used to measure the cabinet response: a sweep played through the device appears nowhere
-on the capture channels, and a gain change from 20 to 127 moves the captured noise by 2.6 dB.
+#### Checked before release
 
-**Download `Surveyor-v1.6.0.apk` below.** Android 8.0 or newer, USB-OTG cable required.
+All 136 shipped cabinets were re-measured with an independent implementation: every one decodes cleanly, keeps its factory pole bank bit for bit, and stays inside the factory envelope on every metric. 80 unit tests, lint with no errors. No hardware was written for this release: the new option uses only the Cabinet Level parameter, already verified on the AMPED 3.
+
+**Download `Surveyor-v1.8.0.apk` below to install.**
