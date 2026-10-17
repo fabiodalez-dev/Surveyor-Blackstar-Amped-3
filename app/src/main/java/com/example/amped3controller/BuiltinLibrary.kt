@@ -9,6 +9,18 @@ import org.json.JSONObject
  * factory library. `assets/cab_library.json` is produced by `LibraryBuildHarness`; every entry
  * records its origin, licence and the sha256 of the WAV it came from. See docs/CAB_LIBRARY.md.
  */
+/** Brand, size, speakers, microphones and source of a shipped cabinet, from a fixed vocabulary;
+ *  empty where the source did not say. Written by `tools/cab_facets.py`. */
+data class CabFacets(val brand: String, val size: String, val speakers: List<String>, val mics: List<String>,
+                     val source: String, val bass: Boolean) {
+    companion object {
+        fun parse(o: JSONObject): CabFacets {
+            fun list(key: String) = (o.optJSONArray(key) ?: JSONArray()).let { a -> (0 until a.length()).map { a.getString(it) } }
+            return CabFacets(o.optString("brand"), o.optString("size"), list("speakers"), list("mics"), o.optString("source"), o.optBoolean("bass"))
+        }
+    }
+}
+
 data class LibraryCab(
     val id: String, val name: String, val kind: String,
     val cabinet: String, val speaker: String, val mic: String, val style: String,
@@ -17,12 +29,14 @@ data class LibraryCab(
     val header: String, val chunks: List<String>,
     val errorDb: Double, val attenuatedDb: Double,
     val bandLow: Double, val bandMid: Double, val bandHigh: Double,
-    val recipe: Recipe?
+    val recipe: Recipe?,
+    val facets: CabFacets? = null
 ) {
     val captured get() = kind == "captured"
 
-    /** The make the cabinet is sold or described under, for the brand filter; "other" when none is named. */
-    val brand: String get() = brandOf("$cabinet $name $pack")
+    /** The make the cabinet is sold or described under, for the brand filter; "other" when none is named.
+     *  Taken from the facets `tools/cab_facets.py` writes into the asset, guessed from the text without them. */
+    val brand: String get() = facets?.brand?.ifBlank { "other" } ?: brandOf("$cabinet $name $pack")
 
     /** Everything a text search can match. */
     val searchText: String get() = "$name $cabinet $speaker $mic $pack $author $style".lowercase()
@@ -56,7 +70,8 @@ data class LibraryCab(
                     o.getString("header"), (0 until 5).map { chunks.getString(it) },
                     o.optDouble("errorDb", Double.NaN), o.optDouble("attenuatedDb", 0.0),
                     bands.optDouble("low", Double.NaN), bands.optDouble("mid", Double.NaN), bands.optDouble("high", Double.NaN),
-                    o.optJSONObject("recipe")?.let { runCatching { Recipe.parse(it) }.getOrNull() })
+                    o.optJSONObject("recipe")?.let { runCatching { Recipe.parse(it) }.getOrNull() },
+                    o.optJSONObject("facets")?.let { CabFacets.parse(it) })
             }
         }
     }

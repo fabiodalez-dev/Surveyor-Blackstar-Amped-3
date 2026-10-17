@@ -21,6 +21,14 @@
   },
   "pack": "Jester's Brutal Pack 1.0",
   "url": "https://jester-dyne-productions.com/brutal-ir-pack/",
+  "facets": {
+   "bass": false,
+   "size": "4x12",
+   "speakers": ["Vintage 30"],
+   "source": "CC0",
+   "brand": "Behringer",
+   "mics": ["SM57"]
+  },
   "license": "CC0 1.0",
   "attenuatedDb": 0,
   "speaker": "Vintage 30",
@@ -54,6 +62,14 @@
   },
   "pack": "Jester's Brutal Pack 1.0",
   "url": "https://jester-dyne-productions.com/brutal-ir-pack/",
+  "facets": {
+   "bass": false,
+   "size": "4x12",
+   "speakers": ["Eminence DV-77"],
+   "source": "CC0",
+   "brand": "Behringer",
+   "mics": ["SM57"]
+  },
   "license": "CC0 1.0",
   "attenuatedDb": 0,
   "speaker": "DV-77",
@@ -87,6 +103,14 @@
   },
   "pack": "Jester's Brutal Pack 1.0",
   "url": "https://jester-dyne-productions.com/brutal-ir-pack/",
+  "facets": {
+   "bass": false,
+   "size": "4x12",
+   "speakers": ["Rockdriver"],
+   "source": "CC0",
+   "brand": "Behringer",
+   "mics": ["e606"]
+  },
   "license": "CC0 1.0",
   "attenuatedDb": 0,
   "speaker": "Rockdriver Jr",
@@ -120,6 +144,20 @@
   },
   "pack": "Jester's Brutal Pack 1.0",
   "url": "https://jester-dyne-productions.com/brutal-ir-pack/",
+  "facets": {
+   "bass": false,
+   "size": "4x12",
+   "speakers": [
+    "Eminence DV-77",
+    "Rockdriver"
+   ],
+   "source": "CC0",
+   "brand": "Behringer",
+   "mics": [
+    "SM57",
+    "e606"
+   ]
+  },
   "license": "CC0 1.0",
   "attenuatedDb": 0,
   "speaker": "Rockdriver Jr + DV-77",
@@ -153,6 +191,20 @@
   },
   "pack": "Jester's Brutal Pack 1.0",
   "url": "https://jester-dyne-productions.com/brutal-ir-pack/",
+  "facets": {
+   "bass": false,
+   "size": "4x12",
+   "speakers": [
+    "Vintage 30",
+    "Rockdriver"
+   ],
+   "source": "CC0",
+   "brand": "Behringer",
+   "mics": [
+    "e606",
+    "PDMIC75"
+   ]
+  },
   "license": "CC0 1.0",
   "attenuatedDb": 0,
   "speaker": "Rockdriver Jr + Vintage 30",
@@ -186,6 +238,17 @@
   },
   "pack": "Jester's Brutal Pack 1.0",
   "url": "https://jester-dyne-productions.com/brutal-ir-pack/",
+  "facets": {
+   "bass": false,
+   "size": "4x12",
+   "speakers": [
+    "Vintage 30",
+    "Eminence DV-77"
+   ],
+   "source": "CC0",
+   "brand": "Behringer",
+   "mics": ["SM57"]
+  },
   "license": "CC0 1.0",
   "attenuatedDb": 0,
   "speaker": "DV-77 + Vintage 30",
@@ -219,6 +282,20 @@
   },
   "pack": "Jester's Brutal Pack 1.0",
   "url": "https://jester-dyne-productions.com/brutal-ir-pack/",
+  "facets": {
+   "bass": false,
+   "size": "4x12",
+   "speakers": [
+    "Vintage 30",
+    "Eminence DV-77"
+   ],
+   "source": "CC0",
+   "brand": "Behringer",
+   "mics": [
+    "SM57",
+    "PDMIC75"
+   ]
+  },
   "license": "CC0 1.0",
   "attenuatedDb": 0,
   "speaker": "Vintage 30 + DV-77",
@@ -252,6 +329,20 @@
   },
   "pack": "Jester's Brutal Pack 1.0",
   "url": "https://jester-dyne-productions.com/brutal-ir-pack/",
+  "facets": {
+   "bass": false,
+   "size": "4x12",
+   "speakers": [
+    "Vintage 30",
+    "Rockdriver"
+   ],
+   "source": "CC0",
+   "brand": "Behringer",
+   "mics": [
+    "SM57",
+    "e606"
+   ]
+  },
   "license": "CC0 1.0",
   "attenuatedDb": 0,
   "speaker": "Rockdriver Jr + Vintage 30",
@@ -285,6 +376,14 @@
   },
   "pack": "Jester's Brutal Pack 1.0",
   "url": "https://jester-dyne-productions.com/brutal-ir-pack/",
+  "facets": {
+   "bass": false,
+   "size": "4x12",
+   "speakers": ["Vintage 30"],
+   "source": "CC0",
+   "brand": "Behringer",
+   "mics": ["PDMIC75"]
+  },
   "license": "CC0 1.0",
   "attenuatedDb": 0,
   "speaker": "Vintage 30",
@@ -318,6 +417,14 @@
   },
   "pack": "Jester's Brutal Pack 1.0",
   "url": "https://jester-dyne-productions.com/brutal-ir-pack/",
+  "facets": {
+   "bass": false,
+   "size": "4x12",
+   "speakers": ["Eminence DV-77"],
+   "source": "CC0",
+   "brand": "Behringer",
+   "mics": ["SM57"]
+  },
   "license": "CC0 1.0",
   "attenuatedDb": 0,
   "speaker": "DV-77",
@@ -351,6 +458,14 @@
   },
   "pack": "Jester's Brutal Pack 1.0",
   "url": "https://jester-dyne-productions.com/brutal-ir-pack/",
+  "facets": {
+   "bass": false,
+   "size": "4x12",
+   "speakers": ["Rockdriver"],
+   "source": "CC0",
+   "brand": "Behringer",
+   "mics": ["SM57"]
+  },
   "license": "CC0 1.0",
   "attenuatedDb": 0,
   "speaker": "Rockdriver Jr",
@@ -384,6 +499,14 @@
   },
   "pack": "Jester's Brutal Pack 1.0",
   "url": "https://jester-dyne-productions.com/brutal-ir-pack/",
+  "facets": {
+   "bass": false,
+   "size": "4x12",
+   "speakers": ["Vintage 30"],
+   "source": "CC0",
+   "brand": "Behringer",
+   "mics": ["SM57"]
+  },
   "license": "CC0 1.0",
   "attenuatedDb": 0,
   "speaker": "Vintage 30",
@@ -417,6 +540,14 @@
   },
   "pack": "Jester's Brutal Pack 1.0",
   "url": "https://jester-dyne-productions.com/brutal-ir-pack/",
+  "facets": {
+   "bass": false,
+   "size": "4x12",
+   "speakers": ["Eminence DV-77"],
+   "source": "CC0",
+   "brand": "Behringer",
+   "mics": ["SM57"]
+  },
   "license": "CC0 1.0",
   "attenuatedDb": 0,
   "speaker": "DV-77",
@@ -450,6 +581,14 @@
   },
   "pack": "Jester's Brutal Pack 1.0",
   "url": "https://jester-dyne-productions.com/brutal-ir-pack/",
+  "facets": {
+   "bass": false,
+   "size": "4x12",
+   "speakers": ["Vintage 30"],
+   "source": "CC0",
+   "brand": "Behringer",
+   "mics": ["SM57"]
+  },
   "license": "CC0 1.0",
   "attenuatedDb": 0,
   "speaker": "Vintage 30",
@@ -483,6 +622,14 @@
   },
   "pack": "Jester's Brutal Pack 1.0",
   "url": "https://jester-dyne-productions.com/brutal-ir-pack/",
+  "facets": {
+   "bass": false,
+   "size": "4x12",
+   "speakers": ["Eminence DV-77"],
+   "source": "CC0",
+   "brand": "Behringer",
+   "mics": ["SM57"]
+  },
   "license": "CC0 1.0",
   "attenuatedDb": 0,
   "speaker": "DV-77",
@@ -516,6 +663,14 @@
   },
   "pack": "Jester's Emerald Pack 1.0",
   "url": "https://www.jester-dyne-productions.com/emerald-ir-pack/",
+  "facets": {
+   "bass": false,
+   "size": "4x12",
+   "speakers": ["Greenback"],
+   "source": "CC0",
+   "brand": "Marshall",
+   "mics": ["SM57"]
+  },
   "license": "CC0 1.0",
   "attenuatedDb": 0,
   "speaker": "Celestion G12M Greenback 25W",
@@ -549,6 +704,14 @@
   },
   "pack": "Jester's Emerald Pack 1.0",
   "url": "https://www.jester-dyne-productions.com/emerald-ir-pack/",
+  "facets": {
+   "bass": false,
+   "size": "4x12",
+   "speakers": ["Greenback"],
+   "source": "CC0",
+   "brand": "Marshall",
+   "mics": ["SM57"]
+  },
   "license": "CC0 1.0",
   "attenuatedDb": 0,
   "speaker": "Celestion G12M Greenback 25W",
@@ -582,6 +745,14 @@
   },
   "pack": "Jester's Emerald Pack 1.0",
   "url": "https://www.jester-dyne-productions.com/emerald-ir-pack/",
+  "facets": {
+   "bass": false,
+   "size": "4x12",
+   "speakers": ["Greenback"],
+   "source": "CC0",
+   "brand": "Marshall",
+   "mics": ["SM57"]
+  },
   "license": "CC0 1.0",
   "attenuatedDb": 0,
   "speaker": "Celestion G12M Greenback 25W",
@@ -615,6 +786,14 @@
   },
   "pack": "Jester's Emerald Pack 1.0",
   "url": "https://www.jester-dyne-productions.com/emerald-ir-pack/",
+  "facets": {
+   "bass": false,
+   "size": "4x12",
+   "speakers": ["Greenback"],
+   "source": "CC0",
+   "brand": "Marshall",
+   "mics": ["e606"]
+  },
   "license": "CC0 1.0",
   "attenuatedDb": 0,
   "speaker": "Celestion G12M Greenback 25W",
@@ -648,6 +827,14 @@
   },
   "pack": "Jester's Emerald Pack 1.0",
   "url": "https://www.jester-dyne-productions.com/emerald-ir-pack/",
+  "facets": {
+   "bass": false,
+   "size": "4x12",
+   "speakers": ["Greenback"],
+   "source": "CC0",
+   "brand": "Marshall",
+   "mics": ["SM57"]
+  },
   "license": "CC0 1.0",
   "attenuatedDb": 0,
   "speaker": "Celestion G12M Greenback 25W",
@@ -681,6 +868,14 @@
   },
   "pack": "Jester's Emerald Pack 1.0",
   "url": "https://www.jester-dyne-productions.com/emerald-ir-pack/",
+  "facets": {
+   "bass": false,
+   "size": "4x12",
+   "speakers": ["Greenback"],
+   "source": "CC0",
+   "brand": "Marshall",
+   "mics": ["e606"]
+  },
   "license": "CC0 1.0",
   "attenuatedDb": 0,
   "speaker": "Celestion G12M Greenback 25W",
@@ -714,6 +909,14 @@
   },
   "pack": "Choptones Boogie 4x12 Road King Redback",
   "url": "https://www.choptones.com",
+  "facets": {
+   "bass": false,
+   "size": "4x12",
+   "speakers": ["Redback"],
+   "source": "Collezione",
+   "brand": "Mesa",
+   "mics": ["RE20"]
+  },
   "license": "paid pack",
   "attenuatedDb": 0,
   "speaker": "Celestion Redback",
@@ -747,6 +950,14 @@
   },
   "pack": "Choptones Boogie 4x12 Road King Redback",
   "url": "https://www.choptones.com",
+  "facets": {
+   "bass": false,
+   "size": "4x12",
+   "speakers": ["Redback"],
+   "source": "Collezione",
+   "brand": "Mesa",
+   "mics": ["PR30"]
+  },
   "license": "paid pack",
   "attenuatedDb": 0,
   "speaker": "Celestion Redback",
@@ -780,6 +991,14 @@
   },
   "pack": "Choptones Boogie 4x12 Road King Redback",
   "url": "https://www.choptones.com",
+  "facets": {
+   "bass": false,
+   "size": "4x12",
+   "speakers": ["Redback"],
+   "source": "Collezione",
+   "brand": "Mesa",
+   "mics": ["MD421"]
+  },
   "license": "paid pack",
   "attenuatedDb": 0,
   "speaker": "Celestion Redback",
@@ -813,6 +1032,14 @@
   },
   "pack": "God's Cab 1.4",
   "url": "https://signalsaudio.com",
+  "facets": {
+   "bass": false,
+   "size": "4x12",
+   "speakers": ["Vintage 30"],
+   "source": "Collezione",
+   "brand": "Mesa",
+   "mics": ["C414"]
+  },
   "license": "free, donation-ware",
   "attenuatedDb": 0,
   "speaker": "Vintage 30",
@@ -846,6 +1073,14 @@
   },
   "pack": "God's Cab 1.4",
   "url": "https://signalsaudio.com",
+  "facets": {
+   "bass": false,
+   "size": "4x12",
+   "speakers": ["Vintage 30"],
+   "source": "Collezione",
+   "brand": "Mesa",
+   "mics": ["MD421"]
+  },
   "license": "free, donation-ware",
   "attenuatedDb": 0,
   "speaker": "Vintage 30",
@@ -879,6 +1114,14 @@
   },
   "pack": "God's Cab 1.4",
   "url": "https://signalsaudio.com",
+  "facets": {
+   "bass": false,
+   "size": "4x12",
+   "speakers": ["Vintage 30"],
+   "source": "Collezione",
+   "brand": "Mesa",
+   "mics": ["SM57"]
+  },
   "license": "free, donation-ware",
   "attenuatedDb": 0,
   "speaker": "Vintage 30",
@@ -912,6 +1155,14 @@
   },
   "pack": "God's Cab 1.4",
   "url": "https://signalsaudio.com",
+  "facets": {
+   "bass": false,
+   "size": "4x12",
+   "speakers": ["Vintage 30"],
+   "source": "Collezione",
+   "brand": "Mesa",
+   "mics": ["U87"]
+  },
   "license": "free, donation-ware; redistribution not stated",
   "attenuatedDb": 0,
   "speaker": "Vintage 30",
@@ -945,6 +1196,14 @@
   },
   "pack": "Live Ready Sound Powercab IR pack v10",
   "url": "https://livereadysound.com",
+  "facets": {
+   "bass": false,
+   "size": "1x12",
+   "speakers": ["Redback"],
+   "source": "Collezione",
+   "brand": "Mesa",
+   "mics": ["e609"]
+  },
   "license": "paid, single-user licence",
   "attenuatedDb": 0,
   "speaker": "Redback",
@@ -978,6 +1237,14 @@
   },
   "pack": "Tone3000: Celestion Vintage 30 - 2002 Mesa Boogie 4x12 - SM57",
   "url": "https://www.tone3000.com/tones/celestion-vintage-30-2002-mesa-boogie-4x12-sm57-45023",
+  "facets": {
+   "bass": false,
+   "size": "4x12",
+   "speakers": ["Vintage 30"],
+   "source": "Tone3000",
+   "brand": "Mesa",
+   "mics": ["SM57"]
+  },
   "license": "Tone3000 t3k",
   "attenuatedDb": 0,
   "speaker": "",
@@ -1011,6 +1278,14 @@
   },
   "pack": "Tone3000: Chug City IR's  ",
   "url": "https://www.tone3000.com/tones/chug-city-ir-s-49430",
+  "facets": {
+   "bass": false,
+   "size": "",
+   "speakers": [],
+   "source": "Tone3000",
+   "brand": "Mix",
+   "mics": []
+  },
   "license": "Tone3000 t3k",
   "attenuatedDb": 0,
   "speaker": "",
@@ -1044,6 +1319,14 @@
   },
   "pack": "Tone3000: Deathblossom IR Mini Pack",
   "url": "https://www.tone3000.com/tones/deathblossom-ir-mini-pack-79467",
+  "facets": {
+   "bass": false,
+   "size": "4x12",
+   "speakers": ["Greenback"],
+   "source": "Tone3000",
+   "brand": "Framus",
+   "mics": []
+  },
   "license": "Tone3000 t3k",
   "attenuatedDb": 0,
   "speaker": "",
@@ -1077,6 +1360,18 @@
   },
   "pack": "Tone3000: Mesa 4x12 Oversized Rectifier Standard - Shure SM57, SM58, KSM313 IRs",
   "url": "https://www.tone3000.com/tones/mesa-4x12-oversized-rectifier-standard-shure-sm57-sm58-ksm313-irs-6271",
+  "facets": {
+   "bass": false,
+   "size": "4x12",
+   "speakers": [],
+   "source": "Tone3000",
+   "brand": "Mesa",
+   "mics": [
+    "SM57",
+    "SM58",
+    "KSM313"
+   ]
+  },
   "license": "Tone3000 t3k",
   "attenuatedDb": 0,
   "speaker": "",
@@ -1110,6 +1405,14 @@
   },
   "pack": "Tone3000: Mesa Boogie ST 4x12A V30  - XR IR PACK",
   "url": "https://www.tone3000.com/tones/mesa-boogie-st-4x12a-v30-xr-ir-pack-79857",
+  "facets": {
+   "bass": false,
+   "size": "4x12",
+   "speakers": ["Vintage 30"],
+   "source": "Tone3000",
+   "brand": "Mesa",
+   "mics": ["SM57"]
+  },
   "license": "Tone3000 t3k",
   "attenuatedDb": 0,
   "speaker": "",
@@ -1143,6 +1446,18 @@
   },
   "pack": "Tone3000: Mesa OS 412 | Black Shadow - VM1265 - DV77 - Swamp Thang | SM57",
   "url": "https://www.tone3000.com/tones/mesa-os-412-black-shadow-vm1265-dv77-swamp-thang-sm57-81954",
+  "facets": {
+   "bass": false,
+   "size": "4x12",
+   "speakers": [
+    "Eminence DV-77",
+    "Swamp Thang",
+    "Black Shadow"
+   ],
+   "source": "Tone3000",
+   "brand": "Mesa",
+   "mics": ["SM57"]
+  },
   "license": "Tone3000 t3k",
   "attenuatedDb": 0,
   "speaker": "",
@@ -1176,6 +1491,17 @@
   },
   "pack": "Tone3000: Mesa OS 4x12 IR",
   "url": "https://www.tone3000.com/tones/mesa-os-4x12-ir-1612",
+  "facets": {
+   "bass": false,
+   "size": "4x12",
+   "speakers": [],
+   "source": "Tone3000",
+   "brand": "Mesa",
+   "mics": [
+    "SM57",
+    "M160"
+   ]
+  },
   "license": "Tone3000 t3k",
   "attenuatedDb": 0,
   "speaker": "",
@@ -1209,6 +1535,17 @@
   },
   "pack": "Tone3000: Mesa Oversized SM57 and VR2 5150 Power",
   "url": "https://www.tone3000.com/tones/mesa-oversized-sm57-and-vr2-5150-power-84863",
+  "facets": {
+   "bass": false,
+   "size": "4x12",
+   "speakers": ["Vintage 30"],
+   "source": "Tone3000",
+   "brand": "Mesa",
+   "mics": [
+    "SM57",
+    "VR2"
+   ]
+  },
   "license": "Tone3000 t3k",
   "attenuatedDb": 0,
   "speaker": "",
@@ -1242,6 +1579,14 @@
   },
   "pack": "Tone3000: Mesa Standard Oversized 4x12 - 2012/2013 - V30",
   "url": "https://www.tone3000.com/tones/mesa-standard-oversized-4x12-2012-2013-v30-26222",
+  "facets": {
+   "bass": false,
+   "size": "4x12",
+   "speakers": ["Vintage 30"],
+   "source": "Tone3000",
+   "brand": "Mesa",
+   "mics": ["SM58"]
+  },
   "license": "Tone3000 t3k",
   "attenuatedDb": 0,
   "speaker": "",
@@ -1275,6 +1620,14 @@
   },
   "pack": "Tone3000: Official Will Putney Album IR's - Guitar",
   "url": "https://www.tone3000.com/tones/official-will-putney-album-ir-s-guitar-47291",
+  "facets": {
+   "bass": false,
+   "size": "",
+   "speakers": [],
+   "source": "Tone3000",
+   "brand": "Mix",
+   "mics": []
+  },
   "license": "Tone3000 t3k",
   "attenuatedDb": 0,
   "speaker": "",
@@ -1308,6 +1661,14 @@
   },
   "pack": "Tone3000: Official Will Putney Album IR's - Guitar",
   "url": "https://www.tone3000.com/tones/official-will-putney-album-ir-s-guitar-47291",
+  "facets": {
+   "bass": false,
+   "size": "",
+   "speakers": [],
+   "source": "Tone3000",
+   "brand": "Mix",
+   "mics": []
+  },
   "license": "Tone3000 t3k",
   "attenuatedDb": 0,
   "speaker": "",
@@ -1341,6 +1702,14 @@
   },
   "pack": "Tone3000: rock metal punk ir packs ",
   "url": "https://www.tone3000.com/tones/rock-metal-punk-ir-packs-57989",
+  "facets": {
+   "bass": false,
+   "size": "",
+   "speakers": [],
+   "source": "Tone3000",
+   "brand": "Mix",
+   "mics": []
+  },
   "license": "Tone3000 t3k",
   "attenuatedDb": 0,
   "speaker": "",
@@ -1374,6 +1743,14 @@
   },
   "pack": "Tone3000: rock metal punk ir packs ",
   "url": "https://www.tone3000.com/tones/rock-metal-punk-ir-packs-57989",
+  "facets": {
+   "bass": false,
+   "size": "",
+   "speakers": [],
+   "source": "Tone3000",
+   "brand": "Mix",
+   "mics": []
+  },
   "license": "Tone3000 t3k",
   "attenuatedDb": 0,
   "speaker": "",
@@ -1407,6 +1784,14 @@
   },
   "pack": "Tone3000: rock metal punk ir packs ",
   "url": "https://www.tone3000.com/tones/rock-metal-punk-ir-packs-57989",
+  "facets": {
+   "bass": false,
+   "size": "",
+   "speakers": [],
+   "source": "Tone3000",
+   "brand": "Mix",
+   "mics": []
+  },
   "license": "Tone3000 t3k",
   "attenuatedDb": 0,
   "speaker": "",
@@ -1440,6 +1825,14 @@
   },
   "pack": "Tone3000: rock metal punk ir packs ",
   "url": "https://www.tone3000.com/tones/rock-metal-punk-ir-packs-57989",
+  "facets": {
+   "bass": false,
+   "size": "",
+   "speakers": [],
+   "source": "Tone3000",
+   "brand": "Mix",
+   "mics": []
+  },
   "license": "Tone3000 t3k",
   "attenuatedDb": 0,
   "speaker": "",
@@ -1473,6 +1866,14 @@
   },
   "pack": "favourites set",
   "url": "",
+  "facets": {
+   "bass": false,
+   "size": "4x12",
+   "speakers": ["Vintage 30"],
+   "source": "Collezione",
+   "brand": "Mesa",
+   "mics": ["SM57"]
+  },
   "license": "origin not recorded",
   "attenuatedDb": 0,
   "speaker": "Vintage 30",
@@ -1506,6 +1907,14 @@
   },
   "pack": "favourites set",
   "url": "",
+  "facets": {
+   "bass": false,
+   "size": "1x12",
+   "speakers": ["C90"],
+   "source": "Collezione",
+   "brand": "Mesa",
+   "mics": ["R121"]
+  },
   "license": "origin not recorded",
   "attenuatedDb": 0,
   "speaker": "C90",
@@ -1539,6 +1948,14 @@
   },
   "pack": "loose files",
   "url": "",
+  "facets": {
+   "bass": false,
+   "size": "4x12",
+   "speakers": ["Vintage 30"],
+   "source": "Collezione",
+   "brand": "Mesa",
+   "mics": []
+  },
   "license": "origin not recorded",
   "attenuatedDb": 0,
   "speaker": "Vintage 30",
@@ -1572,6 +1989,14 @@
   },
   "pack": "1960a cab-sim package",
   "url": "http://aegeanmusic.com/",
+  "facets": {
+   "bass": false,
+   "size": "4x12",
+   "speakers": ["G12T-75"],
+   "source": "Collezione",
+   "brand": "Marshall",
+   "mics": ["i5"]
+  },
   "license": "free; the readme forbids redistribution of the files",
   "attenuatedDb": 0,
   "speaker": "G12T-75",
@@ -1605,6 +2030,14 @@
   },
   "pack": "1960a cab-sim package",
   "url": "http://aegeanmusic.com/",
+  "facets": {
+   "bass": false,
+   "size": "4x12",
+   "speakers": ["G12T-75"],
+   "source": "Collezione",
+   "brand": "Marshall",
+   "mics": ["SM57"]
+  },
   "license": "free; the readme forbids redistribution of the files",
   "attenuatedDb": -1.5216980047295328,
   "speaker": "G12T-75",
@@ -1638,6 +2071,14 @@
   },
   "pack": "Allure Pack (2017)",
   "url": "",
+  "facets": {
+   "bass": false,
+   "size": "4x12",
+   "speakers": ["Greenback"],
+   "source": "Collezione",
+   "brand": "",
+   "mics": []
+  },
   "license": "free download; no terms included",
   "attenuatedDb": 0,
   "speaker": "G12M Greenback",
@@ -1671,6 +2112,14 @@
   },
   "pack": "OwnHammer Rock-Box H30L 2011A",
   "url": "https://www.ownhammer.com",
+  "facets": {
+   "bass": false,
+   "size": "4x12",
+   "speakers": ["G12H30"],
+   "source": "Collezione",
+   "brand": "Marshall",
+   "mics": []
+  },
   "license": "paid pack",
   "attenuatedDb": 0,
   "speaker": "G12H30 Anniversary",
@@ -1704,6 +2153,14 @@
   },
   "pack": "Tone3000: '71 Marshall Fullstack G12M G12H Greenback - XR IR PACK",
   "url": "https://www.tone3000.com/tones/71-marshall-fullstack-g12m-g12h-greenback-xr-ir-pack-79862",
+  "facets": {
+   "bass": false,
+   "size": "4x12",
+   "speakers": ["Greenback"],
+   "source": "Tone3000",
+   "brand": "Marshall",
+   "mics": []
+  },
   "license": "Tone3000 t3k",
   "attenuatedDb": 0,
   "speaker": "",
@@ -1737,6 +2194,14 @@
   },
   "pack": "Tone3000: CavLabs ECP Mix IRs",
   "url": "https://www.tone3000.com/tones/cavlabs-ecp-mix-irs-87072",
+  "facets": {
+   "bass": false,
+   "size": "4x12",
+   "speakers": ["Vintage 30"],
+   "source": "Tone3000",
+   "brand": "Marshall",
+   "mics": []
+  },
   "license": "Tone3000 t3k",
   "attenuatedDb": 0,
   "speaker": "",
@@ -1770,6 +2235,14 @@
   },
   "pack": "Tone3000: Celestion Greenback - Marshall 1960TV 4x12 SM57",
   "url": "https://www.tone3000.com/tones/celestion-greenback-marshall-1960tv-4x12-sm57-45022",
+  "facets": {
+   "bass": false,
+   "size": "4x12",
+   "speakers": ["Greenback"],
+   "source": "Tone3000",
+   "brand": "Marshall",
+   "mics": ["SM57"]
+  },
   "license": "Tone3000 t3k",
   "attenuatedDb": 0,
   "speaker": "",
@@ -1803,6 +2276,14 @@
   },
   "pack": "Tone3000: Marshall 1960 4x12 Celestion G12M",
   "url": "https://www.tone3000.com/tones/marshall-1960-4x12-celestion-g12m-28968",
+  "facets": {
+   "bass": false,
+   "size": "4x12",
+   "speakers": ["Greenback"],
+   "source": "Tone3000",
+   "brand": "Marshall",
+   "mics": ["SM57"]
+  },
   "license": "Tone3000 t3k",
   "attenuatedDb": 0,
   "speaker": "",
@@ -1836,6 +2317,14 @@
   },
   "pack": "Tone3000: Marshall 1960 Lead with Fane Speakers",
   "url": "https://www.tone3000.com/tones/marshall-1960-lead-with-fane-speakers-62037",
+  "facets": {
+   "bass": false,
+   "size": "4x12",
+   "speakers": ["Fane"],
+   "source": "Tone3000",
+   "brand": "Marshall",
+   "mics": ["SM57"]
+  },
   "license": "Tone3000 t3k",
   "attenuatedDb": 0,
   "speaker": "",
@@ -1869,6 +2358,14 @@
   },
   "pack": "Tone3000: Marshall 1960A G12-65 (jcm800)",
   "url": "https://www.tone3000.com/tones/marshall-1960a-g12-65-jcm800-69659",
+  "facets": {
+   "bass": false,
+   "size": "4x12",
+   "speakers": ["G12-65"],
+   "source": "Tone3000",
+   "brand": "Marshall",
+   "mics": []
+  },
   "license": "Tone3000 t3k",
   "attenuatedDb": 0,
   "speaker": "",
@@ -1902,6 +2399,18 @@
   },
   "pack": "Tone3000: Marshall 1960AV - V7X+SM57+RB500",
   "url": "https://www.tone3000.com/tones/marshall-1960av-v7x-sm57-rb500-27221",
+  "facets": {
+   "bass": false,
+   "size": "4x12",
+   "speakers": ["Vintage 30"],
+   "source": "Tone3000",
+   "brand": "Marshall",
+   "mics": [
+    "SM57",
+    "V7X",
+    "RB500"
+   ]
+  },
   "license": "Tone3000 t3k",
   "attenuatedDb": -1.0635313742480783,
   "speaker": "",
@@ -1935,6 +2444,14 @@
   },
   "pack": "Tone3000: Marshall 1960BV V30 and G12T75",
   "url": "https://www.tone3000.com/tones/marshall-1960bv-v30-and-g12t75-51086",
+  "facets": {
+   "bass": false,
+   "size": "4x12",
+   "speakers": ["G12T-75"],
+   "source": "Tone3000",
+   "brand": "Marshall",
+   "mics": ["SM57"]
+  },
   "license": "Tone3000 t3k",
   "attenuatedDb": 0,
   "speaker": "",
@@ -1968,6 +2485,14 @@
   },
   "pack": "Tone3000: Marshall 1960BV V30 and G12T75",
   "url": "https://www.tone3000.com/tones/marshall-1960bv-v30-and-g12t75-51086",
+  "facets": {
+   "bass": false,
+   "size": "4x12",
+   "speakers": ["Vintage 30"],
+   "source": "Tone3000",
+   "brand": "Marshall",
+   "mics": ["SM58"]
+  },
   "license": "Tone3000 t3k",
   "attenuatedDb": 0,
   "speaker": "",
@@ -2001,6 +2526,14 @@
   },
   "pack": "Tone3000: Marshall 4x12 V30 IR",
   "url": "https://www.tone3000.com/tones/marshall-4x12-v30-ir-2129",
+  "facets": {
+   "bass": false,
+   "size": "4x12",
+   "speakers": ["Vintage 30"],
+   "source": "Tone3000",
+   "brand": "Marshall",
+   "mics": []
+  },
   "license": "Tone3000 t3k",
   "attenuatedDb": 0,
   "speaker": "",
@@ -2034,6 +2567,14 @@
   },
   "pack": "Tone3000: Marshall JCM800 LEAD-1960 CAB",
   "url": "https://www.tone3000.com/tones/marshall-jcm800-lead-1960-cab-90295",
+  "facets": {
+   "bass": false,
+   "size": "4x12",
+   "speakers": ["G12T-75"],
+   "source": "Tone3000",
+   "brand": "Marshall",
+   "mics": []
+  },
   "license": "Tone3000 t3k",
   "attenuatedDb": 0,
   "speaker": "",
@@ -2067,6 +2608,18 @@
   },
   "pack": "Tone3000: Mesa Oversized SM57 and VR2 5150 Power",
   "url": "https://www.tone3000.com/tones/mesa-oversized-sm57-and-vr2-5150-power-84863",
+  "facets": {
+   "bass": false,
+   "size": "4x12",
+   "speakers": ["Vintage 30"],
+   "source": "Tone3000",
+   "brand": "Marshall",
+   "mics": [
+    "SM57",
+    "SM58",
+    "VR2"
+   ]
+  },
   "license": "Tone3000 t3k",
   "attenuatedDb": 0,
   "speaker": "",
@@ -2100,6 +2653,14 @@
   },
   "pack": "Tone3000: Nirvana - Nevermind IRs",
   "url": "https://www.tone3000.com/tones/nirvana-nevermind-irs-65695",
+  "facets": {
+   "bass": false,
+   "size": "4x12",
+   "speakers": [],
+   "source": "Tone3000",
+   "brand": "Marshall",
+   "mics": []
+  },
   "license": "Tone3000 t3k",
   "attenuatedDb": 0,
   "speaker": "",
@@ -2133,6 +2694,14 @@
   },
   "pack": "Tone3000: Nirvana - Nevermind IRs",
   "url": "https://www.tone3000.com/tones/nirvana-nevermind-irs-65695",
+  "facets": {
+   "bass": false,
+   "size": "4x12",
+   "speakers": [],
+   "source": "Tone3000",
+   "brand": "Marshall",
+   "mics": []
+  },
   "license": "Tone3000 t3k",
   "attenuatedDb": 0,
   "speaker": "",
@@ -2166,6 +2735,14 @@
   },
   "pack": "Tone3000: Nirvana - Nevermind IRs",
   "url": "https://www.tone3000.com/tones/nirvana-nevermind-irs-65695",
+  "facets": {
+   "bass": false,
+   "size": "4x12",
+   "speakers": [],
+   "source": "Tone3000",
+   "brand": "Marshall",
+   "mics": []
+  },
   "license": "Tone3000 t3k",
   "attenuatedDb": 0,
   "speaker": "",
@@ -2199,6 +2776,14 @@
   },
   "pack": "Tone3000: TJ3 Gen 3 IR Pack (Marshall, Orange, VOX)",
   "url": "https://www.tone3000.com/tones/tj3-gen-3-ir-pack-marshall-orange-vox-82871",
+  "facets": {
+   "bass": false,
+   "size": "4x12",
+   "speakers": ["G12H30"],
+   "source": "Tone3000",
+   "brand": "Orange",
+   "mics": ["R121"]
+  },
   "license": "Tone3000 t3k",
   "attenuatedDb": 0,
   "speaker": "",
@@ -2232,6 +2817,14 @@
   },
   "pack": "Tone3000: UK Greenback - Marshall 1960TV 4x12 M201",
   "url": "https://www.tone3000.com/tones/uk-greenback-marshall-1960tv-4x12-m201-75087",
+  "facets": {
+   "bass": false,
+   "size": "4x12",
+   "speakers": ["Greenback"],
+   "source": "Tone3000",
+   "brand": "Marshall",
+   "mics": ["M201"]
+  },
   "license": "Tone3000 t3k",
   "attenuatedDb": 0,
   "speaker": "",
@@ -2265,6 +2858,14 @@
   },
   "pack": "Tone3000: UK Greenback - Marshall 1960TV 4x12 M201",
   "url": "https://www.tone3000.com/tones/uk-greenback-marshall-1960tv-4x12-m201-75087",
+  "facets": {
+   "bass": false,
+   "size": "4x12",
+   "speakers": ["Greenback"],
+   "source": "Tone3000",
+   "brand": "Marshall",
+   "mics": ["M201"]
+  },
   "license": "Tone3000 t3k",
   "attenuatedDb": 0,
   "speaker": "",
@@ -2298,6 +2899,18 @@
   },
   "pack": "faIR Modern Rock",
   "url": "https://forward-audio.com",
+  "facets": {
+   "bass": false,
+   "size": "4x12",
+   "speakers": [
+    "Vintage 30",
+    "Greenback",
+    "G12T-75"
+   ],
+   "source": "Collezione",
+   "brand": "Marshall",
+   "mics": []
+  },
   "license": "free download; all rights reserved",
   "attenuatedDb": 0,
   "speaker": "V30 / G12T-75 / Greenback",
@@ -2331,6 +2944,14 @@
   },
   "pack": "favourites set",
   "url": "",
+  "facets": {
+   "bass": false,
+   "size": "4x12",
+   "speakers": ["Vintage 30"],
+   "source": "Collezione",
+   "brand": "Marshall",
+   "mics": []
+  },
   "license": "origin not recorded",
   "attenuatedDb": 0,
   "speaker": "Vintage 30",
@@ -2364,6 +2985,14 @@
   },
   "pack": "favourites set",
   "url": "",
+  "facets": {
+   "bass": false,
+   "size": "4x12",
+   "speakers": [],
+   "source": "Collezione",
+   "brand": "Marshall",
+   "mics": []
+  },
   "license": "origin not recorded",
   "attenuatedDb": 0,
   "speaker": "stock",
@@ -2397,6 +3026,14 @@
   },
   "pack": "loose files",
   "url": "",
+  "facets": {
+   "bass": false,
+   "size": "4x12",
+   "speakers": [],
+   "source": "Collezione",
+   "brand": "Marshall",
+   "mics": []
+  },
   "license": "origin not recorded",
   "attenuatedDb": 0,
   "speaker": "stock",
@@ -2430,6 +3067,14 @@
   },
   "pack": "Allure Pack (2017)",
   "url": "",
+  "facets": {
+   "bass": false,
+   "size": "1x12",
+   "speakers": ["Jensen"],
+   "source": "Collezione",
+   "brand": "Fender",
+   "mics": []
+  },
   "license": "free download; no terms included",
   "attenuatedDb": 0,
   "speaker": "Jensen P12N",
@@ -2463,6 +3108,14 @@
   },
   "pack": "Tone3000: 1970 Fender Bassman 2x15 Cabinet Original CTS Speakers",
   "url": "https://www.tone3000.com/tones/1970-fender-bassman-2x15-cabinet-original-cts-speakers-60274",
+  "facets": {
+   "bass": true,
+   "size": "2x15",
+   "speakers": ["CTS"],
+   "source": "Tone3000",
+   "brand": "Fender",
+   "mics": ["C414"]
+  },
   "license": "Tone3000 t3k",
   "attenuatedDb": 0,
   "speaker": "",
@@ -2496,6 +3149,14 @@
   },
   "pack": "Tone3000: 1970 Fender Bassman 2x15 Cabinet Original CTS Speakers",
   "url": "https://www.tone3000.com/tones/1970-fender-bassman-2x15-cabinet-original-cts-speakers-60274",
+  "facets": {
+   "bass": true,
+   "size": "2x15",
+   "speakers": ["CTS"],
+   "source": "Tone3000",
+   "brand": "Fender",
+   "mics": ["SM57"]
+  },
   "license": "Tone3000 t3k",
   "attenuatedDb": 0,
   "speaker": "",
@@ -2529,6 +3190,14 @@
   },
   "pack": "Tone3000: 1970 Fender Bassman 2x15 Cabinet Original CTS Speakers",
   "url": "https://www.tone3000.com/tones/1970-fender-bassman-2x15-cabinet-original-cts-speakers-60274",
+  "facets": {
+   "bass": true,
+   "size": "2x15",
+   "speakers": ["CTS"],
+   "source": "Tone3000",
+   "brand": "Fender",
+   "mics": ["RE20"]
+  },
   "license": "Tone3000 t3k",
   "attenuatedDb": 0,
   "speaker": "",
@@ -2562,6 +3231,14 @@
   },
   "pack": "Tone3000: 1970 Fender Bassman 2x15 Cabinet Original CTS Speakers",
   "url": "https://www.tone3000.com/tones/1970-fender-bassman-2x15-cabinet-original-cts-speakers-60274",
+  "facets": {
+   "bass": true,
+   "size": "2x15",
+   "speakers": ["CTS"],
+   "source": "Tone3000",
+   "brand": "Fender",
+   "mics": ["R121"]
+  },
   "license": "Tone3000 t3k",
   "attenuatedDb": 0,
   "speaker": "",
@@ -2595,6 +3272,14 @@
   },
   "pack": "Tone3000: 1971 Fender Twin Reverb Oxford 12T6-10",
   "url": "https://www.tone3000.com/tones/1971-fender-twin-reverb-oxford-12t6-10-6046",
+  "facets": {
+   "bass": false,
+   "size": "2x12",
+   "speakers": ["Oxford"],
+   "source": "Tone3000",
+   "brand": "Fender",
+   "mics": ["SM57"]
+  },
   "license": "Tone3000 t3k",
   "attenuatedDb": 0,
   "speaker": "",
@@ -2628,6 +3313,14 @@
   },
   "pack": "Tone3000: 1971 Fender Twin Reverb Oxford 12T6-10",
   "url": "https://www.tone3000.com/tones/1971-fender-twin-reverb-oxford-12t6-10-6046",
+  "facets": {
+   "bass": false,
+   "size": "2x12",
+   "speakers": ["Oxford"],
+   "source": "Tone3000",
+   "brand": "Fender",
+   "mics": ["R121"]
+  },
   "license": "Tone3000 t3k",
   "attenuatedDb": 0,
   "speaker": "",
@@ -2661,6 +3354,14 @@
   },
   "pack": "Tone3000: 1971 Fender Twin Reverb Oxford 12T6-10",
   "url": "https://www.tone3000.com/tones/1971-fender-twin-reverb-oxford-12t6-10-6046",
+  "facets": {
+   "bass": false,
+   "size": "2x12",
+   "speakers": ["Oxford"],
+   "source": "Tone3000",
+   "brand": "Fender",
+   "mics": ["C414"]
+  },
   "license": "Tone3000 t3k",
   "attenuatedDb": 0,
   "speaker": "",
@@ -2694,6 +3395,14 @@
   },
   "pack": "Tone3000: 1971 Fender Twin Reverb Oxford 12T6-10",
   "url": "https://www.tone3000.com/tones/1971-fender-twin-reverb-oxford-12t6-10-6046",
+  "facets": {
+   "bass": false,
+   "size": "2x12",
+   "speakers": ["Oxford"],
+   "source": "Tone3000",
+   "brand": "Fender",
+   "mics": ["C414"]
+  },
   "license": "Tone3000 t3k",
   "attenuatedDb": 0,
   "speaker": "",
@@ -2727,6 +3436,14 @@
   },
   "pack": "Tone3000: Deathblossom IR Mini Pack",
   "url": "https://www.tone3000.com/tones/deathblossom-ir-mini-pack-79467",
+  "facets": {
+   "bass": false,
+   "size": "1x12",
+   "speakers": ["Jensen"],
+   "source": "Tone3000",
+   "brand": "Fender",
+   "mics": []
+  },
   "license": "Tone3000 t3k",
   "attenuatedDb": 0,
   "speaker": "",
@@ -2760,6 +3477,14 @@
   },
   "pack": "Tone3000: Fender Deluxe Reverb Mix Ready",
   "url": "https://www.tone3000.com/tones/fender-deluxe-reverb-mix-ready-27465",
+  "facets": {
+   "bass": false,
+   "size": "1x12",
+   "speakers": ["Oxford"],
+   "source": "Tone3000",
+   "brand": "Fender",
+   "mics": []
+  },
   "license": "Tone3000 t3k",
   "attenuatedDb": 0,
   "speaker": "",
@@ -2793,6 +3518,14 @@
   },
   "pack": "Tone3000: Fender Deluxe Reverb Mix Ready",
   "url": "https://www.tone3000.com/tones/fender-deluxe-reverb-mix-ready-27465",
+  "facets": {
+   "bass": false,
+   "size": "1x12",
+   "speakers": ["Oxford"],
+   "source": "Tone3000",
+   "brand": "Fender",
+   "mics": []
+  },
   "license": "Tone3000 t3k",
   "attenuatedDb": 0,
   "speaker": "",
@@ -2826,6 +3559,14 @@
   },
   "pack": "Tone3000: Fender Twin Reverb",
   "url": "https://www.tone3000.com/tones/fender-twin-reverb-33532",
+  "facets": {
+   "bass": false,
+   "size": "2x12",
+   "speakers": [],
+   "source": "Tone3000",
+   "brand": "Fender",
+   "mics": []
+  },
   "license": "Tone3000 t3k",
   "attenuatedDb": 0,
   "speaker": "",
@@ -2859,6 +3600,14 @@
   },
   "pack": "favourites set",
   "url": "",
+  "facets": {
+   "bass": false,
+   "size": "2x12",
+   "speakers": ["Jensen"],
+   "source": "Collezione",
+   "brand": "Fender",
+   "mics": []
+  },
   "license": "origin not recorded",
   "attenuatedDb": 0,
   "speaker": "Jensen",
@@ -2892,6 +3641,14 @@
   },
   "pack": "Kalthallen Cabs IR",
   "url": "http://cabs.kalthallen.de",
+  "facets": {
+   "bass": false,
+   "size": "",
+   "speakers": [],
+   "source": "Collezione",
+   "brand": "Orange",
+   "mics": []
+  },
   "license": "donationware; EULA asks permission for distribution",
   "attenuatedDb": 0,
   "speaker": "",
@@ -2925,6 +3682,14 @@
   },
   "pack": "Kalthallen Cabs IR",
   "url": "http://cabs.kalthallen.de",
+  "facets": {
+   "bass": false,
+   "size": "4x12",
+   "speakers": [],
+   "source": "Collezione",
+   "brand": "Orange",
+   "mics": []
+  },
   "license": "donationware; EULA asks permission for distribution",
   "attenuatedDb": 0,
   "speaker": "",
@@ -2958,6 +3723,14 @@
   },
   "pack": "Tone3000: Deathblossom IR Mini Pack",
   "url": "https://www.tone3000.com/tones/deathblossom-ir-mini-pack-79467",
+  "facets": {
+   "bass": false,
+   "size": "4x12",
+   "speakers": ["Vintage 30"],
+   "source": "Tone3000",
+   "brand": "Orange",
+   "mics": []
+  },
   "license": "Tone3000 t3k",
   "attenuatedDb": 0,
   "speaker": "",
@@ -2991,6 +3764,14 @@
   },
   "pack": "Tone3000: Orange 2x12 V30",
   "url": "https://www.tone3000.com/tones/orange-2x12-v30-29354",
+  "facets": {
+   "bass": false,
+   "size": "2x12",
+   "speakers": ["Vintage 30"],
+   "source": "Tone3000",
+   "brand": "Orange",
+   "mics": ["RM700"]
+  },
   "license": "Tone3000 t3k",
   "attenuatedDb": -0.5078797116294644,
   "speaker": "",
@@ -3024,6 +3805,14 @@
   },
   "pack": "Tone3000: Orange PPC412 (straight) [multi mics]",
   "url": "https://www.tone3000.com/tones/orange-ppc412-straight-multi-mics-70608",
+  "facets": {
+   "bass": false,
+   "size": "4x12",
+   "speakers": ["Vintage 30"],
+   "source": "Tone3000",
+   "brand": "Orange",
+   "mics": ["SM57"]
+  },
   "license": "Tone3000 t3k",
   "attenuatedDb": 0,
   "speaker": "",
@@ -3057,6 +3846,17 @@
   },
   "pack": "Tone3000: Orange V30 4x12 - XR IR PACK",
   "url": "https://www.tone3000.com/tones/orange-v30-4x12-xr-ir-pack-90730",
+  "facets": {
+   "bass": false,
+   "size": "4x12",
+   "speakers": ["Vintage 30"],
+   "source": "Tone3000",
+   "brand": "Orange",
+   "mics": [
+    "MD421",
+    "M160"
+   ]
+  },
   "license": "Tone3000 t3k",
   "attenuatedDb": 0,
   "speaker": "",
@@ -3090,6 +3890,14 @@
   },
   "pack": "loose files",
   "url": "",
+  "facets": {
+   "bass": false,
+   "size": "4x12",
+   "speakers": [],
+   "source": "Collezione",
+   "brand": "Orange",
+   "mics": []
+  },
   "license": "origin not recorded",
   "attenuatedDb": 0,
   "speaker": "",
@@ -3123,6 +3931,14 @@
   },
   "pack": "original IR set",
   "url": "",
+  "facets": {
+   "bass": false,
+   "size": "4x12",
+   "speakers": [],
+   "source": "Collezione",
+   "brand": "Orange",
+   "mics": ["SM57"]
+  },
   "license": "origin not recorded",
   "attenuatedDb": 0,
   "speaker": "",
@@ -3156,6 +3972,14 @@
   },
   "pack": "original IR set",
   "url": "",
+  "facets": {
+   "bass": false,
+   "size": "4x12",
+   "speakers": [],
+   "source": "Collezione",
+   "brand": "Orange",
+   "mics": ["e906"]
+  },
   "license": "origin not recorded",
   "attenuatedDb": 0,
   "speaker": "",
@@ -3189,6 +4013,14 @@
   },
   "pack": "Tone3000:  '64 Vox AC30 Blue Alnicos 2x12  - XR IR PACK",
   "url": "https://www.tone3000.com/tones/64-vox-ac30-blue-alnicos-2x12-xr-ir-pack-79866",
+  "facets": {
+   "bass": false,
+   "size": "2x12",
+   "speakers": ["Alnico Blue"],
+   "source": "Tone3000",
+   "brand": "Vox",
+   "mics": []
+  },
   "license": "Tone3000 t3k",
   "attenuatedDb": 0,
   "speaker": "",
@@ -3222,6 +4054,14 @@
   },
   "pack": "Tone3000: Vox AC30 Mix Ready",
   "url": "https://www.tone3000.com/tones/vox-ac30-mix-ready-27468",
+  "facets": {
+   "bass": false,
+   "size": "2x12",
+   "speakers": ["Alnico Blue"],
+   "source": "Tone3000",
+   "brand": "Vox",
+   "mics": []
+  },
   "license": "Tone3000 t3k",
   "attenuatedDb": 0,
   "speaker": "",
@@ -3255,6 +4095,14 @@
   },
   "pack": "favourites set",
   "url": "",
+  "facets": {
+   "bass": false,
+   "size": "4x12",
+   "speakers": ["Vintage 30"],
+   "source": "Collezione",
+   "brand": "Bogner",
+   "mics": []
+  },
   "license": "origin not recorded",
   "attenuatedDb": 0,
   "speaker": "Vintage 30",
@@ -3288,6 +4136,14 @@
   },
   "pack": "loose files",
   "url": "",
+  "facets": {
+   "bass": false,
+   "size": "2x12",
+   "speakers": [],
+   "source": "Collezione",
+   "brand": "Bogner",
+   "mics": []
+  },
   "license": "origin not recorded",
   "attenuatedDb": 0,
   "speaker": "",
@@ -3321,6 +4177,14 @@
   },
   "pack": "loose files",
   "url": "",
+  "facets": {
+   "bass": false,
+   "size": "2x12",
+   "speakers": [],
+   "source": "Collezione",
+   "brand": "Bogner",
+   "mics": []
+  },
   "license": "origin not recorded",
   "attenuatedDb": 0,
   "speaker": "",
@@ -3354,6 +4218,14 @@
   },
   "pack": "loose files",
   "url": "",
+  "facets": {
+   "bass": false,
+   "size": "4x12",
+   "speakers": [],
+   "source": "Collezione",
+   "brand": "Bogner",
+   "mics": []
+  },
   "license": "origin not recorded",
   "attenuatedDb": 0,
   "speaker": "",
@@ -3387,6 +4259,14 @@
   },
   "pack": "Tone3000: Eminence Karnivore 8 Ohm, Engl E412 Pro 4 x 12 (96Khz)",
   "url": "https://www.tone3000.com/tones/eminence-karnivore-8-ohm-engl-e412-pro-4-x-12-96khz-39748",
+  "facets": {
+   "bass": false,
+   "size": "4x12",
+   "speakers": ["Karnivore"],
+   "source": "Tone3000",
+   "brand": "ENGL",
+   "mics": ["MD421"]
+  },
   "license": "Tone3000 t3k",
   "attenuatedDb": 0,
   "speaker": "",
@@ -3420,6 +4300,14 @@
   },
   "pack": "Tone3000: METAL BAND TONES. Impulse response",
   "url": "https://www.tone3000.com/tones/metal-band-tones-impulse-response-62933",
+  "facets": {
+   "bass": false,
+   "size": "4x12",
+   "speakers": [],
+   "source": "Tone3000",
+   "brand": "ENGL",
+   "mics": []
+  },
   "license": "Tone3000 t3k",
   "attenuatedDb": 0,
   "speaker": "",
@@ -3453,6 +4341,18 @@
   },
   "pack": "Tone3000: Mesa Oversized SM57 and VR2 5150 Power",
   "url": "https://www.tone3000.com/tones/mesa-oversized-sm57-and-vr2-5150-power-84863",
+  "facets": {
+   "bass": false,
+   "size": "4x12",
+   "speakers": ["Vintage 30"],
+   "source": "Tone3000",
+   "brand": "ENGL",
+   "mics": [
+    "SM57",
+    "SM58",
+    "VR2"
+   ]
+  },
   "license": "Tone3000 t3k",
   "attenuatedDb": 0,
   "speaker": "",
@@ -3486,6 +4386,14 @@
   },
   "pack": "Live Ready Sound Powercab IR pack v10",
   "url": "https://livereadysound.com",
+  "facets": {
+   "bass": false,
+   "size": "1x12",
+   "speakers": ["G12-EVH"],
+   "source": "Collezione",
+   "brand": "EVH",
+   "mics": ["SM57"]
+  },
   "license": "paid, single-user licence",
   "attenuatedDb": 0,
   "speaker": "EVH 20W Greenback",
@@ -3519,6 +4427,14 @@
   },
   "pack": "Tone3000: Celestion G12-EVH - EVH 5150III 4x12",
   "url": "https://www.tone3000.com/tones/celestion-g12-evh-evh-5150iii-4x12-40738",
+  "facets": {
+   "bass": false,
+   "size": "4x12",
+   "speakers": ["G12-EVH"],
+   "source": "Tone3000",
+   "brand": "EVH",
+   "mics": ["SM57"]
+  },
   "license": "Tone3000 t3k",
   "attenuatedDb": 0,
   "speaker": "",
@@ -3552,6 +4468,14 @@
   },
   "pack": "favourites set",
   "url": "",
+  "facets": {
+   "bass": false,
+   "size": "4x12",
+   "speakers": ["G12-EVH"],
+   "source": "Collezione",
+   "brand": "EVH",
+   "mics": []
+  },
   "license": "origin not recorded",
   "attenuatedDb": 0,
   "speaker": "EVH Celestion",
@@ -3585,6 +4509,17 @@
   },
   "pack": "favourites set",
   "url": "",
+  "facets": {
+   "bass": false,
+   "size": "4x12",
+   "speakers": [
+    "Vintage 30",
+    "Greenback"
+   ],
+   "source": "Collezione",
+   "brand": "Friedman",
+   "mics": []
+  },
   "license": "origin not recorded",
   "attenuatedDb": 0,
   "speaker": "Vintage 30 / Greenback",
@@ -3618,6 +4553,17 @@
   },
   "pack": "Tone3000: Celestion Vintage 30 (2004) + Rockdriver  Vintage G12 (1997) DIY cab 2x12 SM57",
   "url": "https://www.tone3000.com/tones/celestion-vintage-30-2004-rockdriver-vintage-g12-1997-diy-cab-2x12-sm57-88597",
+  "facets": {
+   "bass": false,
+   "size": "4x12",
+   "speakers": [
+    "Vintage 30",
+    "Rockdriver"
+   ],
+   "source": "Tone3000",
+   "brand": "Peavey",
+   "mics": ["SM57"]
+  },
   "license": "Tone3000 t3k",
   "attenuatedDb": 0,
   "speaker": "",
@@ -3651,6 +4597,14 @@
   },
   "pack": "original IR set",
   "url": "",
+  "facets": {
+   "bass": false,
+   "size": "4x12",
+   "speakers": [],
+   "source": "Collezione",
+   "brand": "Peavey",
+   "mics": ["MD421"]
+  },
   "license": "origin not recorded",
   "attenuatedDb": -0.8587694984146124,
   "speaker": "",
@@ -3684,6 +4638,14 @@
   },
   "pack": "Tone3000: JC120 Cab Impulses",
   "url": "https://www.tone3000.com/tones/jc120-cab-impulses-1644",
+  "facets": {
+   "bass": false,
+   "size": "2x12",
+   "speakers": [],
+   "source": "Tone3000",
+   "brand": "Roland",
+   "mics": ["C636"]
+  },
   "license": "Tone3000 t3k",
   "attenuatedDb": 0,
   "speaker": "",
@@ -3717,6 +4679,14 @@
   },
   "pack": "favourites set",
   "url": "",
+  "facets": {
+   "bass": false,
+   "size": "2x12",
+   "speakers": [],
+   "source": "Collezione",
+   "brand": "Roland",
+   "mics": []
+  },
   "license": "origin not recorded",
   "attenuatedDb": 0,
   "speaker": "stock",
@@ -3750,6 +4720,14 @@
   },
   "pack": "favourites set",
   "url": "",
+  "facets": {
+   "bass": false,
+   "size": "2x12",
+   "speakers": [],
+   "source": "Collezione",
+   "brand": "Two-Rock",
+   "mics": []
+  },
   "license": "origin not recorded",
   "attenuatedDb": 0,
   "speaker": "",
@@ -3783,6 +4761,14 @@
   },
   "pack": "Allure Pack (2017)",
   "url": "",
+  "facets": {
+   "bass": false,
+   "size": "4x12",
+   "speakers": ["Fane"],
+   "source": "Collezione",
+   "brand": "Hiwatt",
+   "mics": []
+  },
   "license": "free download; no terms included",
   "attenuatedDb": 0,
   "speaker": "Fane",
@@ -3816,6 +4802,14 @@
   },
   "pack": "Tone3000: Ampeg SVT - DI - 4x10 - 8x10 - the definitive speaker capture collection",
   "url": "https://www.tone3000.com/tones/ampeg-svt-di-4x10-8x10-the-definitive-speaker-capture-collection-45241",
+  "facets": {
+   "bass": true,
+   "size": "4x10",
+   "speakers": [],
+   "source": "Tone3000",
+   "brand": "Ampeg",
+   "mics": ["Beta 52"]
+  },
   "license": "Tone3000 t3k",
   "attenuatedDb": 0,
   "speaker": "",
@@ -3849,6 +4843,14 @@
   },
   "pack": "Tone3000: Bass Ampeg SVT  8x10 ",
   "url": "https://www.tone3000.com/tones/bass-ampeg-svt-8x10-1708",
+  "facets": {
+   "bass": true,
+   "size": "8x10",
+   "speakers": [],
+   "source": "Tone3000",
+   "brand": "Ampeg",
+   "mics": []
+  },
   "license": "Tone3000 t3k",
   "attenuatedDb": 0,
   "speaker": "",
@@ -3882,6 +4884,17 @@
   },
   "pack": "Tone3000: IR pack - Vintage Warmth & Organic Vibe",
   "url": "https://www.tone3000.com/tones/ir-pack-vintage-warmth-organic-vibe-67574",
+  "facets": {
+   "bass": true,
+   "size": "2x15",
+   "speakers": ["Kappalite"],
+   "source": "Tone3000",
+   "brand": "Science",
+   "mics": [
+    "SM57",
+    "RE20"
+   ]
+  },
   "license": "Tone3000 t3k",
   "attenuatedDb": 0,
   "speaker": "",
@@ -3915,6 +4928,14 @@
   },
   "pack": "Javier Serrano JS-IR-WS",
   "url": "https://javierserrano.com",
+  "facets": {
+   "bass": false,
+   "size": "",
+   "speakers": [],
+   "source": "Collezione",
+   "brand": "",
+   "mics": ["U47"]
+  },
   "license": "paid pack",
   "attenuatedDb": 0,
   "speaker": "",
@@ -3948,6 +4969,14 @@
   },
   "pack": "Kalthallen Cabs IR",
   "url": "http://cabs.kalthallen.de",
+  "facets": {
+   "bass": false,
+   "size": "4x12",
+   "speakers": ["G12T-75"],
+   "source": "Collezione",
+   "brand": "",
+   "mics": ["SM57"]
+  },
   "license": "donationware; EULA asks permission for distribution",
   "attenuatedDb": 0,
   "speaker": "G12T75",
@@ -3981,6 +5010,14 @@
   },
   "pack": "Live Ready Sound Powercab IR pack v10",
   "url": "https://livereadysound.com",
+  "facets": {
+   "bass": false,
+   "size": "1x12",
+   "speakers": ["Jensen"],
+   "source": "Collezione",
+   "brand": "",
+   "mics": []
+  },
   "license": "paid, single-user licence",
   "attenuatedDb": 0,
   "speaker": "Jensen C12K",
@@ -4014,6 +5051,14 @@
   },
   "pack": "Tone3000: Best & Biggest IR Files Collection \u2013 from AC/DC to Arch Enemy",
   "url": "https://www.tone3000.com/tones/best-biggest-ir-files-collection-from-ac-dc-to-arch-enemy-83759",
+  "facets": {
+   "bass": false,
+   "size": "",
+   "speakers": [],
+   "source": "Tone3000",
+   "brand": "Mix",
+   "mics": []
+  },
   "license": "Tone3000 t3k",
   "attenuatedDb": 0,
   "speaker": "",
@@ -4047,6 +5092,14 @@
   },
   "pack": "Tone3000: Driftwood 4x12 Cabinet",
   "url": "https://www.tone3000.com/tones/driftwood-4x12-cabinet-89673",
+  "facets": {
+   "bass": false,
+   "size": "4x12",
+   "speakers": ["Vintage 30"],
+   "source": "Tone3000",
+   "brand": "Driftwood",
+   "mics": ["AT250"]
+  },
   "license": "Tone3000 t3k",
   "attenuatedDb": 0,
   "speaker": "",
@@ -4080,6 +5133,14 @@
   },
   "pack": "Tone3000: METAL BAND TONES. Impulse response",
   "url": "https://www.tone3000.com/tones/metal-band-tones-impulse-response-62933",
+  "facets": {
+   "bass": false,
+   "size": "",
+   "speakers": [],
+   "source": "Tone3000",
+   "brand": "Mix",
+   "mics": []
+  },
   "license": "Tone3000 t3k",
   "attenuatedDb": 0,
   "speaker": "",
@@ -4113,6 +5174,14 @@
   },
   "pack": "Tone3000: Metallica Song Impulse Responses",
   "url": "https://www.tone3000.com/tones/metallica-song-impulse-responses-4685",
+  "facets": {
+   "bass": false,
+   "size": "",
+   "speakers": [],
+   "source": "Tone3000",
+   "brand": "Mix",
+   "mics": []
+  },
   "license": "Tone3000 t3k",
   "attenuatedDb": 0,
   "speaker": "",
@@ -4146,6 +5215,14 @@
   },
   "pack": "faIR Post Grunge",
   "url": "https://forward-audio.com",
+  "facets": {
+   "bass": false,
+   "size": "4x12",
+   "speakers": ["Vintage 30"],
+   "source": "Collezione",
+   "brand": "",
+   "mics": []
+  },
   "license": "free download; all rights reserved",
   "attenuatedDb": 0,
   "speaker": "Vintage 30",
@@ -4179,6 +5256,14 @@
   },
   "pack": "loose files",
   "url": "",
+  "facets": {
+   "bass": false,
+   "size": "4x12",
+   "speakers": [],
+   "source": "Collezione",
+   "brand": "",
+   "mics": []
+  },
   "license": "origin not recorded",
   "attenuatedDb": 0,
   "speaker": "",
@@ -4212,6 +5297,14 @@
   },
   "pack": "loose files",
   "url": "",
+  "facets": {
+   "bass": false,
+   "size": "1x12",
+   "speakers": ["Jensen"],
+   "source": "Collezione",
+   "brand": "",
+   "mics": ["SM57"]
+  },
   "license": "origin not recorded",
   "attenuatedDb": 0,
   "speaker": "Jensen C12N",
@@ -4262,6 +5355,14 @@
   },
   "pack": "",
   "url": "",
+  "facets": {
+   "bass": false,
+   "size": "4x12",
+   "speakers": [],
+   "source": "Progettate",
+   "brand": "Blackstar",
+   "mics": []
+  },
   "license": "",
   "attenuatedDb": 0,
   "speaker": "factory model",
@@ -4311,6 +5412,14 @@
   },
   "pack": "",
   "url": "",
+  "facets": {
+   "bass": false,
+   "size": "4x12",
+   "speakers": [],
+   "source": "Progettate",
+   "brand": "Blackstar",
+   "mics": []
+  },
   "license": "",
   "attenuatedDb": 0,
   "speaker": "factory model",
@@ -4360,6 +5469,14 @@
   },
   "pack": "",
   "url": "",
+  "facets": {
+   "bass": false,
+   "size": "1x12",
+   "speakers": [],
+   "source": "Progettate",
+   "brand": "Blackstar",
+   "mics": []
+  },
   "license": "",
   "attenuatedDb": 0,
   "speaker": "factory model",
@@ -4410,6 +5527,14 @@
   },
   "pack": "",
   "url": "",
+  "facets": {
+   "bass": false,
+   "size": "2x12",
+   "speakers": [],
+   "source": "Progettate",
+   "brand": "Blackstar",
+   "mics": []
+  },
   "license": "",
   "attenuatedDb": 0,
   "speaker": "factory model",
@@ -4459,6 +5584,14 @@
   },
   "pack": "",
   "url": "",
+  "facets": {
+   "bass": false,
+   "size": "1x12",
+   "speakers": [],
+   "source": "Progettate",
+   "brand": "Blackstar",
+   "mics": []
+  },
   "license": "",
   "attenuatedDb": 0,
   "speaker": "factory model",
@@ -4509,6 +5642,14 @@
   },
   "pack": "",
   "url": "",
+  "facets": {
+   "bass": false,
+   "size": "4x12",
+   "speakers": [],
+   "source": "Progettate",
+   "brand": "Blackstar",
+   "mics": []
+  },
   "license": "",
   "attenuatedDb": 0,
   "speaker": "factory model",
@@ -4558,6 +5699,14 @@
   },
   "pack": "",
   "url": "",
+  "facets": {
+   "bass": false,
+   "size": "2x12",
+   "speakers": [],
+   "source": "Progettate",
+   "brand": "Blackstar",
+   "mics": []
+  },
   "license": "",
   "attenuatedDb": 0,
   "speaker": "factory model",
@@ -4607,6 +5756,14 @@
   },
   "pack": "",
   "url": "",
+  "facets": {
+   "bass": false,
+   "size": "4x12",
+   "speakers": [],
+   "source": "Progettate",
+   "brand": "Blackstar",
+   "mics": []
+  },
   "license": "",
   "attenuatedDb": 0,
   "speaker": "factory model",
