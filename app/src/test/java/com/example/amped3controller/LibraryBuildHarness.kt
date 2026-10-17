@@ -13,7 +13,9 @@ import java.io.File
  * Put the impulse responses and a `manifest.json` in `build/ir_library/` (the WAVs are not in the
  * repository, the manifest records their sha256 and origin) and run this test. With no manifest
  * it does nothing. Designed cabinets come from `build/ir_library/designed.json`, a list of
- * recipes, and are fitted the same way.
+ * recipes, and are fitted the same way. The `facets` of each entry (brand, size, speakers,
+ * microphones, source) are written by `tools/cab_facets.py` and carried over by id; a new entry
+ * gets them when the script is run again.
  */
 class LibraryBuildHarness {
     @Test
@@ -45,7 +47,13 @@ class LibraryBuildHarness {
                 println("%-22s template %-8s error %.2f dB".format(java.util.Locale.US, e.getString("id"), c.templateKey, c.errorDb))
             }
         }
-        File("src/main/assets/cab_library.json").writeText(out.toString(1))
+        // the facets come from tools/cab_facets.py, not from the fit: keep the ones already in the asset
+        val asset = File("src/main/assets/cab_library.json")
+        val facets = runCatching { JSONArray(asset.readText()) }.getOrNull()?.let { old ->
+            (0 until old.length()).map { old.getJSONObject(it) }.filter { it.has("facets") }.associate { it.getString("id") to it.getJSONObject("facets") }
+        }.orEmpty()
+        for (i in 0 until out.length()) out.getJSONObject(i).let { e -> facets[e.getString("id")]?.let { e.put("facets", it) } }
+        asset.writeText(out.toString(1))
         println("wrote ${out.length()} profiles to src/main/assets/cab_library.json")
     }
 

@@ -96,7 +96,7 @@ class LibraryStore(private val dir: File, private val log: (String) -> Unit) {
 
     private val prefsFile = File(dir, "cabinet_prefs.json")
     private val prefsMutable = MutableStateFlow(readPrefs())
-    /** Favourite factory keys ("cab:mic:axis"), the last ones loaded, most recent first, and
+    /** Favourite factory keys ("cab:mic:axis") and shipped cabinets ("lib:<id>"), the last ones loaded, most recent first, and
      *  whether loading a cabinet levels its volume (off unless the user turns it on). */
     val cabinetPrefs = prefsMutable.asStateFlow()
 
@@ -107,7 +107,7 @@ class LibraryStore(private val dir: File, private val log: (String) -> Unit) {
         if (!prefsFile.exists()) return CabinetPrefs()
         val o = JSONObject(prefsFile.readText())
         fun list(key: String) = (o.optJSONArray(key) ?: JSONArray()).let { a -> (0 until a.length()).map { a.getString(it) } }
-            .filter { Regex("""(1?\d|2[0-3]):[0-5]:[01]""").matches(it) }
+            .filter { Regex("""(1?\d|2[0-3]):[0-5]:[01]|lib:[A-Za-z0-9._-]{1,80}""").matches(it) }
         CabinetPrefs(list("favorites").take(50), list("recents").take(10), o.optBoolean("levelMatch", false))
     }.getOrDefault(CabinetPrefs())
 
