@@ -50,55 +50,52 @@ import java.util.Locale
     val prefs by c.cabinetPrefs.collectAsState()
     val selectedKey = FactoryProfiles.key(cabinet, mic, axis)
     fun pick(key: String) { val (a, b, d) = key.split(":").map { it.toInt() }; cabinet = a; mic = b; axis = d }
-    CabinetDrawing(AmpedProtocol.cabinetNames.getOrNull(cabinet) ?: name,
-        applied = cabinet == s.cab[0] && mic == s.cab[1] && axis == s.cab[2])
-    Text(T("Libreria DSP completa · 24 casse × 6 microfoni × 2 assi", "Complete DSP library · 24 cabinets × 6 mics × 2 axes"),color=Muted,fontSize=12.sp)
+
+    // one catalogue for Blackstar's cabinets and the shipped ones; a shipped one, when chosen, replaces the factory controls
+    val catalog = remember(c.builtin) { CabCatalog.build(c.builtin) }
+    var libId by remember(s.cab[0]) { mutableStateOf<String?>(null) }
+    val lib = libId?.let { id -> c.builtin.firstOrNull { it.id == id } }
+    val current = catalog.firstOrNull { it.id == (lib?.let { l -> "lib:${l.id}" } ?: "f:$cabinet") } ?: catalog.first()
+    val thumbnails = remember { HashMap<String, DoubleArray?>() }
+    fun curveOf(cab: CatalogCab): DoubleArray? = thumbnails.getOrPut(cab.id) {
+        runCatching { cab.factory?.let { c.factory.curve(FactoryProfiles.key(it, 0, 0)) } ?: cab.lib?.let { libraryCurve(it) } }.getOrNull()
+    }
+    var filter by remember { mutableStateOf(CatalogFilter()) }
+    var browsing by remember { mutableStateOf(false) }
+    fun choose(cab: CatalogCab) {
+        if (cab.factory != null) {
+            libId = null; cabinet = cab.factory
+            // a microphone chosen as a filter is the one the factory cabinet opens with
+            CabCatalog.factoryMics.indexOf(filter.mic).takeIf { it >= 0 }?.let { mic = it }
+        } else libId = cab.lib?.id
+    }
+
+    val favorite = if (lib == null) selectedKey in prefs.favorites else "lib:${lib.id}" in prefs.favorites
+    CabSelector(current, curveOf(current), favorite, catalog.size, onBrowse = { browsing = true },
+        onFavorite = { c.toggleFavoriteCabinet(if (lib == null) selectedKey else "lib:${lib.id}") }) {
+        if (lib == null) CabinetDrawing(AmpedProtocol.cabinetNames.getOrNull(cabinet) ?: name,
+            applied = cabinet == s.cab[0] && mic == s.cab[1] && axis == s.cab[2])
+        else CabinetDrawing("${current.size} ${lib.cabinet}".trim(), applied = s.customLoaded && s.customName == lib.name)
+    }
+    if (browsing) CabBrowserSheet(catalog, filter, { filter = it }, prefs.favorites, ::curveOf, current.id,
+        onPick = { choose(it); browsing = false }, onDismiss = { browsing = false })
 
     // favourites and the last cabinets loaded, one tap away
     if (prefs.favorites.isNotEmpty() || prefs.recents.isNotEmpty()) {
         FlowRowCompat {
-            prefs.favorites.forEach { k -> Chip("★ " + FactoryProfiles.name(k), k == selectedKey) { pick(k) } }
-            prefs.recents.filter { it !in prefs.favorites }.forEach { k -> Chip("↺ " + FactoryProfiles.name(k), k == selectedKey) { pick(k) } }
+            prefs.favorites.forEach { k ->
+                if (k.startsWith("lib:")) catalog.firstOrNull { it.id == k }?.let { cab -> Chip("★ " + cab.title.take(28), cab.id == current.id) { choose(cab) } }
+                else Chip("★ " + FactoryProfiles.name(k), lib == null && k == selectedKey) { libId = null; pick(k) }
+            }
+            prefs.recents.filter { it !in prefs.favorites }.forEach { k -> Chip("↺ " + FactoryProfiles.name(k), lib == null && k == selectedKey) { libId = null; pick(k) } }
         }
     }
 
-    // the list, narrowed by size, origin, build and a word
-    var size by remember { mutableStateOf("") }
-    var origin by remember { mutableStateOf("") }
-    var build by remember { mutableStateOf("") }
-    var query by remember { mutableStateOf("") }
-    var cabinetExpanded by remember { mutableStateOf(false) }
-    FlowRowCompat {
-        listOf("1x", "2x", "4x", "DI").forEach { f -> Chip(f, size == f) { size = if (size == f) "" else f } }
-        listOf("UK", "USA").forEach { f -> Chip(f, origin == f) { origin = if (origin == f) "" else f } }
-        listOf("Combo", "Open", "Closed", "Stack").forEach { f -> Chip(f, build == f) { build = if (build == f) "" else f } }
-    }
-    val matching = AmpedProtocol.cabinetNames.withIndex().filter { (_, n) ->
-        (size.isEmpty() || (if (size == "DI") n == "DI" else n.startsWith(size))) &&
-        (origin.isEmpty() || n.contains(origin)) && (build.isEmpty() || n.contains(build)) &&
-        (query.isBlank() || n.contains(query.trim(), ignoreCase = true))
-    }
-    Text(T("Cassa", "Cabinet").uppercase(), color=Muted, fontSize=12.sp, fontWeight=FontWeight.Bold, letterSpacing=1.4.sp)
-    Box(modifier = Modifier.fillMaxWidth()) {
-        OutlinedButton(onClick={cabinetExpanded=true}, enabled=!s.busy, modifier=Modifier.fillMaxWidth().testTag("cabinet-selector")) {
-            Text(AmpedProtocol.cabinetNames[cabinet] + if (matching.size < AmpedProtocol.cabinetNames.size) "  (${matching.size})" else "")
-        }
-        DropdownMenu(expanded=cabinetExpanded,onDismissRequest={cabinetExpanded=false}) {
-            OutlinedTextField(value=query,onValueChange={query=it.take(30)},placeholder={Text(T("cerca…", "search…"))},singleLine=true,modifier=Modifier.padding(horizontal=8.dp).testTag("cabinet-search"))
-            matching.forEach { (i, n) ->
-                DropdownMenuItem(text={Text(n)},onClick={cabinet=i;cabinetExpanded=false})
-            }
-            if (matching.isEmpty()) DropdownMenuItem(text={Text(T("Nessuna cassa con questi filtri", "No cabinet matches"),color=Muted)},onClick={})
-        }
-    }
+    if (lib != null) LibraryDetail(s, c, lib) else {
     Choices(T("Microfono", "Microphone"),mic,AmpedProtocol.micNames.mapIndexed { i, n -> n to i },!s.busy){mic=it}
     Choices(T("Asse", "Axis"),axis,listOf("On Axis" to 0,"Off Axis" to 1),!s.busy){axis=it}
-    Row(verticalAlignment=Alignment.CenterVertically) {
-        Text(T("Selezionato: ", "Selected: ") + FactoryProfiles.name(selectedKey),color=Muted,fontSize=12.sp,modifier=Modifier.weight(1f))
-        TextButton(onClick={c.toggleFavoriteCabinet(selectedKey)},modifier=Modifier.testTag("favorite-cabinet")) { Text(if (selectedKey in prefs.favorites) "★" else "☆", color=if (selectedKey in prefs.favorites) Red else Muted, fontSize=18.sp) }
-    }
+    Text(T("Selezionato: ", "Selected: ") + FactoryProfiles.name(selectedKey),color=Muted,fontSize=12.sp)
     Text(T("Caricato: ", "Loaded: ") + "$name · ${AmpedProtocol.micShortNames.getOrNull(s.cab[1])?:"—"} · ${if(s.cab[2]==0)"On Axis" else if(s.cab[2]==1)"Off Axis" else "—"}",color=Muted,fontSize=12.sp)
-
     // what the choice sounds like, on paper: its curve, against whatever is worth comparing it with
     var compare by remember { mutableStateOf("") }   // "", "B", "mics", "axis"
     var keyB by remember { mutableStateOf("18:0:0") }
@@ -136,6 +133,7 @@ import java.util.Locale
         color = Muted, fontSize = 11.sp)
     Button(onClick={c.chooseCab(cabinet,mic,axis)},enabled=s.synced&&!s.busy,modifier=Modifier.fillMaxWidth().testTag("apply-cabinet")){Text(T("Applica profilo DSP", "Load DSP profile"))}
     if (!s.synced) Text(T("Collega AMPED 3 via USB OTG e premi Connetti per applicare il profilo scelto.", "Connect the AMPED 3 over USB OTG and tap Connect to load the chosen profile."), color=Muted, fontSize=12.sp)
+    }
     Row(verticalAlignment = Alignment.CenterVertically) {
         Checkbox(checked = s.cab.getOrNull(5) == 1, onCheckedChange = { c.setParameter(true, 5, if (it) 1 else 0) }, enabled = s.synced && !s.busy)
         Text("Solo", modifier = Modifier.padding(start = 4.dp, end = 16.dp))
@@ -206,12 +204,14 @@ import java.util.Locale
  *  cosi' una 2x12 non viene disegnata come una 4x12. La voce DI non ha cassa: si disegna la presa. */
 @Composable internal fun CabinetDrawing(name:String, applied:Boolean){
     val misure = Regex("^(\\d+)x(\\d+)").find(name)
-    val coni = misure?.groupValues?.get(1)?.toIntOrNull() ?: 0
+    // a shipped cabinet whose source never gave its size is drawn as one cone and labelled IR
+    val ignota = misure == null && name != "DI"
+    val coni = misure?.groupValues?.get(1)?.toIntOrNull() ?: if (ignota) 1 else 0
     val pollici = misure?.groupValues?.get(2)?.toIntOrNull() ?: 12
     val combo = name.contains("Combo", true)
     val telaio = if (applied) Color(0xff9a918c) else Color(0xff57524f)
     val cono = if (applied) Color(0xff6a6462) else Color(0xff413d3b)
-    Box(Modifier.fillMaxWidth().height(168.dp).background(Panel, RoundedCornerShape(12.dp))) {
+    Box(Modifier.fillMaxWidth().height(150.dp).background(Panel, RoundedCornerShape(12.dp))) {
         Canvas(Modifier.fillMaxSize()) {
             if (coni == 0) { // DI: nessuna cassa, segnale diretto
                 val l = 58.dp.toPx()
@@ -223,10 +223,11 @@ import java.util.Locale
                 drawLine(telaio, Offset(cx+l/2, cy), Offset(cx+l/2+22.dp.toPx(), cy), 3.dp.toPx(), StrokeCap.Round)
                 return@Canvas
             }
-            val colonne = if (coni >= 2) 2 else 1
-            val righe = if (coni >= 4) 2 else 1
+            // una 2x15 sta in piedi, una 8x10 e' una colonna di quattro file
+            val colonne = if (coni >= 2 && !(coni == 2 && pollici >= 15)) 2 else 1
+            val righe = (coni + colonne - 1) / colonne
             // un 10 pollici e' visibilmente piu' piccolo di un 12: la differenza si deve vedere
-            val raggio = (if (coni >= 4) 22.dp else 27.dp).toPx() * (if (pollici <= 10) 0.84f else 1f)
+            val raggio = (if (righe >= 4) 15.dp else if (righe >= 2) 22.dp else 27.dp).toPx() * (if (pollici <= 10) 0.84f else 1f)
             val w = (raggio*2 + 14.dp.toPx()) * colonne
             val h = (raggio*2 + 14.dp.toPx()) * righe + (if (combo) 16.dp.toPx() else 0f)
             val x = (size.width - w)/2; val y = (size.height - h)/2
@@ -243,7 +244,7 @@ import java.util.Locale
             }
         }
         Text(
-            if (coni == 0) "DI" else "${coni}x${pollici}",
+            if (coni == 0) "DI" else if (ignota) "IR" else "${coni}x${pollici}",
             Modifier.align(Alignment.TopStart).padding(14.dp),
             color = if (applied) Paper else Muted, fontSize = 13.sp,
             fontWeight = FontWeight.Black, letterSpacing = 1.5.sp
